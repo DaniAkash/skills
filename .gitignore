@@ -1,0 +1,6 @@
+# Evaluation workspace and outputs (generated, not source)
+*-workspace/
+*.output
+
+# OS files
+.DS_Store

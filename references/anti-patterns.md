@@ -1,6 +1,181 @@
 # useEffect Anti-Patterns
 
-These are the five most common misuses of useEffect, each with a detailed explanation of why it is wrong, how to recognize it, and what to do instead.
+These are the six most common misuses of useEffect, each with a detailed explanation of why it is wrong, how to recognize it, and what to do instead.
+
+## 0. Non-Primitive Dependencies (The Silent Killer)
+
+### Why it is wrong
+
+React compares dependency array values using `Object.is`. For primitives (strings, numbers, booleans), this checks value equality. For objects, arrays, and functions, it checks **reference identity**. An object created during render is a brand new reference every time, even if its contents are identical.
+
+This means `useEffect(() => { ... }, [someObject])` re-runs on **every single render**, because `someObject` is never `Object.is`-equal to the previous render's `someObject`. This is the root cause of many infinite loops, unnecessary API calls, and performance problems.
+
+### Smell test
+
+- Your dependency array contains variables that are objects, arrays, or functions defined during render
+- The effect runs more often than you expect
+- You see infinite re-render loops after adding a dependency the linter asked for
+- You have `options`, `config`, `params`, `style`, or `callbacks` in your deps array
+
+### Incorrect — object in deps causes infinite loop
+
+```tsx
+function UserDashboard({ userId }: { userId: string }) {
+  // This object is a NEW reference every render
+  const filters = { status: 'active', role: 'admin' }
+
+  const [users, setUsers] = useState<User[]>([])
+
+  useEffect(() => {
+    fetchUsers(userId, filters).then(setUsers)
+  }, [userId, filters]) // filters is NEVER the same → runs every render → infinite loop
+}
+```
+
+### Incorrect — inline callback in deps
+
+```tsx
+function SearchResults({ query }: { query: string }) {
+  // New function reference every render
+  const buildUrl = () => `/api/search?q=${query}`
+
+  useEffect(() => {
+    fetch(buildUrl()).then(r => r.json()).then(setResults)
+  }, [buildUrl]) // buildUrl changes every render
+}
+```
+
+### Incorrect — prop object in deps
+
+```tsx
+// Parent renders: <Chart config={{ animate: true, theme: 'dark' }} />
+// The inline object is a new reference on every parent render
+
+function Chart({ config }: { config: ChartConfig }) {
+  useEffect(() => {
+    initChart(config)
+  }, [config]) // config is a new object every time the parent renders!
+}
+```
+
+### Correct — destructure to primitives
+
+```tsx
+function UserDashboard({ userId }: { userId: string }) {
+  const status = 'active'
+  const role = 'admin'
+
+  const [users, setUsers] = useState<User[]>([])
+
+  useEffect(() => {
+    fetchUsers(userId, { status, role }).then(setUsers)
+  }, [userId, status, role]) // primitives — stable comparison
+}
+```
+
+### Correct — hoist constants outside component
+
+```tsx
+const FILTERS = { status: 'active', role: 'admin' } as const
+
+function UserDashboard({ userId }: { userId: string }) {
+  const [users, setUsers] = useState<User[]>([])
+
+  useEffect(() => {
+    fetchUsers(userId, FILTERS).then(setUsers)
+  }, [userId]) // FILTERS is a module-level constant — same reference always
+}
+```
+
+### Correct — destructure object props to primitives
+
+```tsx
+function Chart({ config }: { config: { animate: boolean; theme: string } }) {
+  const { animate, theme } = config
+
+  useEffect(() => {
+    initChart({ animate, theme })
+  }, [animate, theme]) // primitives — stable comparison
+}
+```
+
+### Correct — move function inside effect
+
+```tsx
+function SearchResults({ query }: { query: string }) {
+  useEffect(() => {
+    // Function lives inside the effect — no external dependency needed
+    const url = `/api/search?q=${query}`
+    fetch(url).then(r => r.json()).then(setResults)
+  }, [query]) // clean, minimal, correct
+}
+```
+
+### Correct — useCallback for callbacks that must stay outside the effect
+
+```tsx
+function SearchResults({ query }: { query: string }) {
+  const fetchResults = useCallback(() => {
+    return fetch(`/api/search?q=${query}`).then(r => r.json())
+  }, [query])
+
+  useEffect(() => {
+    fetchResults().then(setResults)
+  }, [fetchResults]) // stable — only changes when query changes
+}
+```
+
+### The Real Fix: Stabilize at the Source
+
+The best solution is almost always to stabilize references in the parent — not to work around unstable references in the consumer.
+
+```tsx
+// BAD: Parent creates new object every render
+function Parent() {
+  return <Child options={{ verbose: true }} />
+}
+
+function Child({ options }: { options: Options }) {
+  useEffect(() => {
+    setup(options)
+  }, [options]) // fires every render!
+}
+
+// BEST: Parent stabilizes with a module-level constant
+const OPTIONS = { verbose: true }
+function Parent() {
+  return <Child options={OPTIONS} />
+}
+
+// OR: Parent stabilizes with useMemo when values are dynamic
+function Parent({ verbose, debug }: ParentProps) {
+  const options = useMemo(() => ({ verbose, debug }), [verbose, debug])
+  return <Child options={options} />
+}
+
+// FALLBACK: Child destructures to primitives when parent can't be changed
+function Child({ options }: { options: Options }) {
+  const { verbose } = options
+  useEffect(() => {
+    setup({ verbose })
+  }, [verbose])
+}
+```
+
+### What NOT to Do
+
+Do not use `JSON.stringify` in dependency arrays to "stabilize" non-primitives:
+
+```tsx
+// ANTIPATTERN — don't do this
+const stableData = useMemo(() => data, [JSON.stringify(data)])
+```
+
+- `JSON.stringify` runs every render regardless — you pay the serialization cost unconditionally
+- Breaks on non-serializable values (functions, `undefined`, circular refs, `Date` objects)
+- Order-sensitive: `{ a: 1, b: 2 }` and `{ b: 2, a: 1 }` produce different strings for equivalent objects
+
+---
 
 ## 1. Derived State via Effects
 

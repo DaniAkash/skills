@@ -7,130 +7,167 @@ description: Guides correct usage of React's useEffect hook — when to use it, 
 
 useEffect exists for one purpose: **synchronizing a component with an external system**. If you are not connecting to a browser API, a WebSocket, a third-party widget, or some other system outside of React, you almost certainly do not need useEffect.
 
-Most useEffect usage in the wild is compensating for something React already gives you better primitives for: derived state, event handlers, data-fetching abstractions, and component identity via keys.
+## Decision Flowchart
 
-This matters even more when agents are writing code. useEffect is often added "just in case," but that impulse is the seed of the next race condition, infinite loop, or cascading re-render chain.
+Before writing `useEffect`:
 
-## The Decision Flowchart
+1. **Computing a value from props or state?** → Compute inline. Use `useMemo` if expensive.
+2. **Responding to a user interaction?** → Event handler.
+3. **Fetching data?** → Data library (TanStack Query, SWR) or `use` hook with Suspense.
+4. **Resetting state when a prop changes?** → `key` prop for clean remount.
+5. **Subscribing to an external data source?** → `useSyncExternalStore`.
+6. **Synchronizing with a browser API / third-party widget / external system?** → useEffect with cleanup.
 
-Before writing `useEffect`, walk through this:
-
-1. **Are you computing a value from props or state?**
-   Do not store it in state. Do not sync it with an effect. Compute it inline during render. If it is expensive, wrap it in `useMemo`.
-
-2. **Are you responding to a user interaction?**
-   Put the logic in the event handler. Effects run because a component rendered, not because the user did something. These are different things.
-
-3. **Are you fetching data?**
-   Use a data-fetching library (TanStack Query, SWR) or React's `use` hook with Suspense. Raw useEffect fetching creates race conditions and reimplements caching badly.
-
-4. **Are you resetting state when a prop changes?**
-   Use React's `key` prop to force a clean remount. The component gets a fresh identity and all state resets automatically.
-
-5. **Are you subscribing to an external data source?**
-   Use `useSyncExternalStore`. It is purpose-built for this and handles server rendering correctly.
-
-6. **Are you synchronizing with a browser API, third-party widget, or external system?**
-   This is what useEffect is for. Use it with proper cleanup.
-
-If you reached step 6, useEffect is the right tool. Otherwise, there is a better pattern.
-
-## The Five Anti-Patterns
-
-These are the most common misuses of useEffect. Each one has a better alternative. For detailed code examples of all five, read `references/anti-patterns.md`.
+## Anti-Patterns
 
 ### 1. Derived State via Effects
 
-Setting state inside an effect based on other state or props. This causes a double render — first with stale values, then with the "synced" values — and creates state drift when dependencies are missed.
-
 ```tsx
-// Never do this
+// BAD — double render, state drift
 const [filtered, setFiltered] = useState([])
-useEffect(() => {
-  setFiltered(items.filter(i => i.active))
-}, [items])
+useEffect(() => { setFiltered(items.filter(i => i.active)) }, [items])
 
-// Compute inline instead
+// GOOD
 const filtered = items.filter(i => i.active)
 ```
 
 ### 2. Data Fetching in Effects
 
-Calling fetch inside useEffect without cancellation, caching, or deduplication. Every component instance runs its own fetch. Fast navigation causes race conditions where old responses overwrite new ones.
-
 ```tsx
-// Fragile — race conditions, no caching
-useEffect(() => {
-  fetch(`/api/user/${id}`).then(r => r.json()).then(setUser)
-}, [id])
+// BAD — race conditions, no caching
+useEffect(() => { fetch(`/api/user/${id}`).then(r => r.json()).then(setUser) }, [id])
 
-// Use a data library instead
+// GOOD
 const { data: user } = useQuery(['user', id], () => fetchUser(id))
 ```
 
 ### 3. Event Responses via Effects
 
-Using state as a flag so an effect can "react" to a user action. The state is a relay — the real work belongs in the handler.
-
 ```tsx
-// The submitted flag is just a relay
+// BAD — flag relay
 const [submitted, setSubmitted] = useState(false)
-useEffect(() => {
-  if (submitted) { postForm(); setSubmitted(false) }
-}, [submitted])
+useEffect(() => { if (submitted) { postForm(); setSubmitted(false) } }, [submitted])
 
-// Do it directly
+// GOOD
 function handleSubmit() { postForm() }
 ```
 
 ### 4. Resetting State on Prop Change
 
-Watching a prop in an effect and calling setState to "reset" — this is lifecycle thinking from class components.
-
 ```tsx
-// Effect resets state when userId changes
-useEffect(() => { setComment('') }, [userId])
+// BAD
+useEffect(() => { setDraft(''); setAttachments([]) }, [noteId])
 
-// Use key instead — React handles it
-<ProfileEditor key={userId} userId={userId} />
+// GOOD
+<NoteEditor key={noteId} noteId={noteId} />
 ```
 
 ### 5. Effect Chains
 
-Multiple effects where one sets state that triggers another, creating a cascade of re-renders and hard-to-trace control flow.
+Multiple effects where one sets state that triggers another. Consolidate into the event handler or derive values inline. See `references/anti-patterns.md` for detailed examples.
 
-Consolidate the logic into the event handler that starts the chain, or derive intermediate values inline. Read `references/anti-patterns.md` for the full pattern.
+## Non-Primitive Dependencies
+
+Objects, arrays, and functions in dependency arrays cause effects to re-run every render because React uses reference comparison (`Object.is`). This applies equally to:
+
+- **Props** from the parent (objects, arrays, callbacks)
+- **Locally-owned state** that is an object or array
+- **Inline objects/functions** created during render
+
+### Props: stabilize at source or destructure
+
+```tsx
+// Parent stabilizes
+const data = useMemo(() => transform(raw), [raw])
+return <Chart data={data} animate={true} color="blue" />
+
+// Or child destructures to primitives
+const { animate, color } = config
+useEffect(() => { init({ animate, color }) }, [animate, color])
+```
+
+### Local object state: depend on primitive fields, not the object
+
+This is easy to miss because you own the state. If your effect only reads specific fields from a state object, depend on those fields — not the whole object.
+
+```tsx
+// BAD — lastSaved is a new object after every save → effect re-runs
+const [lastSaved, setLastSaved] = useState({ title: '', body: '' })
+useEffect(() => {
+  const timer = setTimeout(() => save(title, body), 2000)
+  return () => clearTimeout(timer)
+}, [title, body, lastSaved]) // lastSaved is an object — unstable
+
+// GOOD — depend on the primitive fields you actually read
+const lastSavedRef = useRef({ title: '', body: '' })
+useEffect(() => {
+  const timer = setTimeout(() => {
+    save(title, body)
+    lastSavedRef.current = { title, body }
+  }, 2000)
+  return () => clearTimeout(timer)
+}, [title, body]) // only primitives
+```
+
+If you need to compare current state to a previous snapshot, use a ref for the snapshot — refs don't trigger re-runs.
+
+### Do NOT narrow deps to dodge non-primitives
+
+If your effect reads an entire array, do not depend on `.length` alone. The effect will miss content changes.
+
+```tsx
+// BAD — stale if contents change but length stays the same
+useEffect(() => { items.forEach(process) }, [items.length])
+
+// GOOD — depend on what you read
+useEffect(() => { items.forEach(process) }, [items])
+```
+
+### Do NOT use JSON.stringify in deps
+
+```tsx
+// ANTIPATTERN — runs every render, breaks on non-serializable data
+const stable = useMemo(() => data, [JSON.stringify(data)])
+```
+
+## Callback Props in Effects
+
+Callback props are functions — new reference every render unless the parent uses `useCallback`. If an effect calls a callback prop, stabilize it with a ref:
+
+```tsx
+// BAD — effect re-fires every render
+useEffect(() => {
+  const timer = setTimeout(() => onDismiss(id), 5000)
+  return () => clearTimeout(timer)
+}, [id, onDismiss]) // onDismiss is unstable
+
+// GOOD — ref-based stable wrapper
+const onDismissRef = useRef(onDismiss)
+onDismissRef.current = onDismiss
+useEffect(() => {
+  const timer = setTimeout(() => onDismissRef.current(id), 5000)
+  return () => clearTimeout(timer)
+}, [id]) // stable
+```
+
+If a callback is **only used in event handlers** (click, submit, etc.) and never in effects, it does not need stabilization — just call it directly. Only stabilize callbacks that appear in effect dependency arrays.
+
+## Rules for Writing Effects
+
+1. **Always include cleanup** for subscriptions, timers, and listeners
+2. **Never lie about dependencies** — include every value the effect reads
+3. **Stabilize non-primitives** — destructure objects to primitives, use refs for callbacks and snapshots, or stabilize at the source
+4. **Handle race conditions** with a cleanup flag (`let ignore = false`)
+5. **Use functional state updates** — `setCount(c => c + 1)` removes `count` from deps
+6. **Use `useReducer`** for complex state — `dispatch` is always stable
+7. **Move functions inside effects** if only used by that effect
 
 ## When useEffect IS Correct
 
-useEffect is the right tool for synchronizing with external systems. Read `references/correct-usage.md` for detailed patterns including cleanup, race condition prevention, and dependency best practices.
+- DOM manipulation (focus, scroll, layout measurement)
+- Subscriptions (WebSocket, event listeners, Intersection Observer)
+- Third-party widgets with imperative APIs
+- Analytics / page view tracking
+- Timers tied to component lifecycle
 
-Legitimate uses:
-- **DOM manipulation**: Focus, scroll, measuring layout (use `useLayoutEffect` if measurement must happen before paint)
-- **Subscriptions**: WebSocket connections, browser event listeners, Intersection Observer
-- **Third-party widgets**: Map libraries, video players, chart libraries with imperative APIs
-- **Analytics**: Page view tracking, telemetry that runs because the component was displayed
-- **Timers**: Intervals and timeouts tied to the component lifecycle
-
-## Modern Alternatives Reference
-
-React 19 introduced hooks that eliminate even more useEffect use cases. Read `references/modern-alternatives.md` for:
-- `use` — read Promises during render with Suspense
-- `useOptimistic` — optimistic UI without manual pending state
-- `useActionState` — form submission with built-in isPending
-- `useEffectEvent` — stable callbacks in effects without dependency churn
-- `useSyncExternalStore` — subscribe to external stores
-- `useTransition` / `useDeferredValue` — non-blocking state updates
-
-## Rules for Writing Effects Correctly
-
-When you do need useEffect, follow these rules:
-
-1. **Always include cleanup** for subscriptions, timers, and listeners
-2. **Never lie about dependencies** — include every value from the render scope that the effect reads
-3. **Use primitive dependencies** — `[user.id]` not `[user]` — to avoid unnecessary re-runs
-4. **Handle race conditions** in async effects with a cleanup flag (`let ignore = false`)
-5. **Use functional state updates** — `setCount(c => c + 1)` removes the dependency on `count`
-6. **Use `useReducer`** when multiple state variables interact inside an effect — dispatch is always stable
-7. **Move functions inside effects** if they are only used by that effect, to make dependencies explicit
-8. **Use `useEffectEvent`** (when available) to extract non-reactive logic from effects
+See `references/correct-usage.md` for patterns. See `references/modern-alternatives.md` for React 19 hooks (`use`, `useOptimistic`, `useActionState`, `useEffectEvent`).

@@ -1,0 +1,74 @@
+{
+  "skill_name": "better-use-effect",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Build a React component called AutoSaveEditor that receives a documentId prop and loads/saves document data. It has title and body text fields. It should auto-save to `/api/documents/${documentId}` two seconds after the user stops typing. Show save status (saving/saved/unsaved). When switching documents, the editor should start fresh. Track whether the current form has unsaved changes.",
+      "expected_output": "key prop for document switch, derived unsaved indicator, debounce timer as legitimate effect, no object state in deps",
+      "files": [],
+      "assertions": [
+        "documentId change resets form via key prop (not useEffect watching documentId)",
+        "Unsaved changes is derived by comparing current values to saved values (not synced via useEffect)",
+        "Debounce timer uses useEffect with cleanup (legitimate)",
+        "No object or array values in any useEffect dependency array (including local state objects like lastSaved/savedData)",
+        "Shows save status indicator"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Create a React component called PollManager that polls an API endpoint `/api/status` every 5 seconds using setInterval. It receives an onStatusChange callback prop and a pollingConfig prop ({interval, retryLimit}). When the status value changes between polls, call onStatusChange with the new status. Display the current status and a count of how many times the status has changed. Stop polling after retryLimit consecutive errors.",
+      "expected_output": "Interval is legitimate useEffect. onStatusChange callback must be stabilized (ref). pollingConfig is an object prop that must be destructured. Status change count should be derived or tracked correctly. The effect should not re-subscribe the interval when callbacks change.",
+      "files": [],
+      "assertions": [
+        "Uses useEffect for setInterval (correct use case)",
+        "useEffect has cleanup that clears the interval",
+        "onStatusChange callback is stabilized via ref (not placed directly in deps)",
+        "pollingConfig object is destructured to primitives before use in deps",
+        "Interval does not restart when callback prop changes",
+        "Status change count is tracked correctly"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Create a React component called ActivityFeed that receives an `events` prop (array of {id, type, message, timestamp}) and an `onAcknowledge` callback prop. Display events sorted by timestamp (newest first). When new events appear that weren't in the previous render, flash a notification banner for 3 seconds. Each event has an Acknowledge button that calls onAcknowledge(event.id). Show a count of unacknowledged events.",
+      "expected_output": "Sorted events and count are derived. New-event detection must compare current vs previous (not just length). The 3-second banner timer is legitimate useEffect. onAcknowledge only used in click handler should NOT be stabilized unnecessarily. If onAcknowledge is used in an effect it must be stabilized.",
+      "files": [],
+      "assertions": [
+        "Sorted events are derived inline (not synced via useEffect + setState)",
+        "Unacknowledged count is derived inline",
+        "New-event detection compares against previous events (not just array length)",
+        "Banner timer uses useEffect with cleanup (legitimate)",
+        "onAcknowledge is called directly in click handler (not relayed through effect)",
+        "onAcknowledge is NOT unnecessarily stabilized if only used in event handlers"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Build a React component called SyncedFormPair. It receives a resourceId prop and a syncConfig prop ({debounceMs, endpoint}). It has two text fields: 'local notes' and 'shared notes'. Local notes are only stored locally. Shared notes auto-sync to `${syncConfig.endpoint}/${resourceId}` after debounceMs milliseconds of inactivity. Display a sync indicator (syncing/synced/out-of-sync). When resourceId changes, both fields should reset. Track the last-synced version to determine out-of-sync status.",
+      "expected_output": "key prop for resourceId reset. syncConfig must be destructured to primitives. The last-synced snapshot should be a ref (not object state in deps). Sync indicator derived from comparing current vs last-synced. Debounce is legitimate useEffect.",
+      "files": [],
+      "assertions": [
+        "resourceId change resets form via key prop",
+        "syncConfig object is destructured to primitives before use in deps",
+        "Last-synced snapshot uses ref (not object state placed in useEffect deps)",
+        "Out-of-sync indicator is derived by comparing current values to last-synced ref",
+        "Debounce timer uses useEffect with cleanup",
+        "No object or array values in any useEffect dependency array"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Create a React component called MetricsMonitor that receives a metrics prop (array of {id, name, value, threshold}) and an onAlert callback prop. Display metrics sorted by name. Show how many are currently above threshold. When any metric crosses from below threshold to above it between renders, call onAlert(metricId, metricName). Each metric row has a Mute button that calls onAlert with a 'muted' flag.",
+      "expected_output": "Sorted list and count are derived. Threshold crossing needs previous-value tracking via ref. onAlert must be stabilized for the crossing-detection effect but should be called directly (not stabilized) for the Mute button click handler.",
+      "files": [],
+      "assertions": [
+        "Sorted metrics derived inline",
+        "Count of exceeded metrics derived inline",
+        "Threshold crossing compares current vs previous values via ref",
+        "onAlert is stabilized (ref) for use in the crossing-detection effect",
+        "onAlert is called directly in the Mute button click handler (not unnecessarily stabilized for event-only usage)",
+        "Alert fires only on crossing (below→above), not on every render where value > threshold"
+      ]
+    }
+  ]
+}
