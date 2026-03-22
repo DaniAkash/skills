@@ -87,30 +87,15 @@ function UserDashboard({ userId }: { userId: string }) {
 }
 ```
 
-### Correct — useMemo for dynamic objects
+### Correct — destructure object props to primitives
 
 ```tsx
-function Chart({ animate, theme }: { animate: boolean; theme: string }) {
-  const config = useMemo(() => ({ animate, theme }), [animate, theme])
+function Chart({ config }: { config: { animate: boolean; theme: string } }) {
+  const { animate, theme } = config
 
   useEffect(() => {
-    initChart(config)
-  }, [config]) // config only changes when animate or theme actually change
-}
-```
-
-### Correct — useCallback for function dependencies
-
-```tsx
-function SearchResults({ query }: { query: string }) {
-  const buildUrl = useCallback(
-    () => `/api/search?q=${query}`,
-    [query]
-  )
-
-  useEffect(() => {
-    fetch(buildUrl()).then(r => r.json()).then(setResults)
-  }, [buildUrl]) // stable — only changes when query changes
+    initChart({ animate, theme })
+  }, [animate, theme]) // primitives — stable comparison
 }
 ```
 
@@ -126,9 +111,23 @@ function SearchResults({ query }: { query: string }) {
 }
 ```
 
-### The Parent Prop Trap
+### Correct — useCallback for callbacks that must stay outside the effect
 
-A particularly nasty variant: the parent passes an inline object or callback as a prop. The child correctly lists it in deps, but the effect fires every render because the parent creates a new reference each time.
+```tsx
+function SearchResults({ query }: { query: string }) {
+  const fetchResults = useCallback(() => {
+    return fetch(`/api/search?q=${query}`).then(r => r.json())
+  }, [query])
+
+  useEffect(() => {
+    fetchResults().then(setResults)
+  }, [fetchResults]) // stable — only changes when query changes
+}
+```
+
+### The Real Fix: Stabilize at the Source
+
+The best solution is almost always to stabilize references in the parent — not to work around unstable references in the consumer.
 
 ```tsx
 // BAD: Parent creates new object every render
@@ -142,13 +141,19 @@ function Child({ options }: { options: Options }) {
   }, [options]) // fires every render!
 }
 
-// GOOD: Parent stabilizes the reference
+// BEST: Parent stabilizes with a module-level constant
 const OPTIONS = { verbose: true }
 function Parent() {
   return <Child options={OPTIONS} />
 }
 
-// OR: Child destructures to primitives
+// OR: Parent stabilizes with useMemo when values are dynamic
+function Parent({ verbose, debug }: ParentProps) {
+  const options = useMemo(() => ({ verbose, debug }), [verbose, debug])
+  return <Child options={options} />
+}
+
+// FALLBACK: Child destructures to primitives when parent can't be changed
 function Child({ options }: { options: Options }) {
   const { verbose } = options
   useEffect(() => {
@@ -156,6 +161,19 @@ function Child({ options }: { options: Options }) {
   }, [verbose])
 }
 ```
+
+### What NOT to Do
+
+Do not use `JSON.stringify` in dependency arrays to "stabilize" non-primitives:
+
+```tsx
+// ANTIPATTERN — don't do this
+const stableData = useMemo(() => data, [JSON.stringify(data)])
+```
+
+- `JSON.stringify` runs every render regardless — you pay the serialization cost unconditionally
+- Breaks on non-serializable values (functions, `undefined`, circular refs, `Date` objects)
+- Order-sensitive: `{ a: 1, b: 2 }` and `{ b: 2, a: 1 }` produce different strings for equivalent objects
 
 ---
 

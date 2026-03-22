@@ -127,13 +127,14 @@ React 19 introduced hooks that eliminate even more useEffect use cases. Read `re
 This is one of the most insidious useEffect bugs. When you put an object, array, or function in a dependency array, the effect re-runs on every render — even if the value is semantically identical — because React uses `Object.is` comparison, and non-primitives get new references on every render.
 
 ```tsx
-// BUG: options is a new object every render → effect runs every render → infinite loop
+// BUG: both data (array) and options (object) are non-primitives
+// → new references every render → effect runs every render
 function Chart({ data }: { data: DataPoint[] }) {
   const options = { animate: true, color: 'blue' }
 
   useEffect(() => {
     renderChart(data, options)
-  }, [data, options]) // options is NEVER the same reference twice
+  }, [data, options]) // BOTH are new references every render
 }
 ```
 
@@ -141,26 +142,87 @@ This is especially dangerous because:
 - It looks correct — you included all dependencies as the linter tells you to
 - It silently causes infinite re-renders or wasted work
 - The bug is invisible until you hit performance issues or infinite loops
+- **Props that are objects or arrays are just as dangerous** — the parent may pass a new reference on every render even if the contents haven't changed
 - Inline objects, arrays, and arrow functions created during render are new references every time
 
-**Fixes:**
+### The Real Fix: Stabilize at the Source
+
+The best fix is almost always to **stabilize references where they are created** — in the parent — rather than working around unstable references in the consumer. If the parent memoizes its data, the child's standard deps array just works.
 
 ```tsx
-// Fix 1: Extract primitive values from the object
-useEffect(() => {
-  renderChart(data, { animate, color })
-}, [data, animate, color]) // primitives — stable comparison
-
-// Fix 2: Hoist the constant outside the component
-const OPTIONS = { animate: true, color: 'blue' } // stable reference
-function Chart({ data }: { data: DataPoint[] }) {
-  useEffect(() => { renderChart(data, OPTIONS) }, [data])
+// PARENT: stabilize the data before passing it down
+function Dashboard() {
+  const data = useMemo(() => computeChartData(rawData), [rawData])
+  return <Chart data={data} animate={true} color="blue" />
 }
 
-// Fix 3: useMemo to stabilize the reference
-const options = useMemo(() => ({ animate, color }), [animate, color])
-useEffect(() => { renderChart(data, options) }, [data, options])
+// CHILD: standard deps array works because parent provides a stable reference
+function Chart({ data, animate, color }: ChartProps) {
+  useEffect(() => {
+    renderChart(data, { animate, color })
+  }, [data, animate, color]) // data is stable from parent, animate/color are primitives
+}
 ```
+
+When you control the parent, this is always the cleanest solution — no refs, no tricks, no fighting the dependency system.
+
+### When You Don't Control the Parent
+
+If you're writing a reusable component and can't guarantee the parent will memoize:
+
+```tsx
+// Destructure object props to primitive values in the dependency array
+function Chart({ config }: { config: { animate: boolean; color: string } }) {
+  const { animate, color } = config
+  useEffect(() => {
+    renderChart({ animate, color })
+  }, [animate, color]) // primitives — stable comparison
+}
+
+// For array/object props that feed an imperative API, use separate effects
+function Chart({ data, animate, color }: ChartProps) {
+  const chartRef = useRef<ChartInstance | null>(null)
+
+  // Init once — animate and color captured at creation time
+  useEffect(() => {
+    chartRef.current = createChart({ animate, color })
+    return () => { chartRef.current?.destroy() }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Update data via the library's imperative API
+  // data is non-primitive, so this effect may run more than needed,
+  // but setData is cheap and idempotent — a reasonable trade-off
+  useEffect(() => {
+    chartRef.current?.setData(data)
+  }, [data])
+}
+```
+
+### Hoist constants outside the component
+
+For values that are truly static, move them to module scope so they are the same reference across all renders:
+
+```tsx
+const DEFAULT_OPTIONS = { animate: true, color: 'blue' } as const
+
+function Chart({ data }: { data: DataPoint[] }) {
+  useEffect(() => {
+    renderChart(data, DEFAULT_OPTIONS)
+  }, [data]) // DEFAULT_OPTIONS is a module constant — always the same reference
+}
+```
+
+### What NOT to do
+
+Do not use `JSON.stringify` in dependency arrays to "stabilize" non-primitives:
+
+```tsx
+// ANTIPATTERN: JSON.stringify runs every render, breaks on non-serializable data,
+// and is order-sensitive for objects
+const stableData = useMemo(() => data, [JSON.stringify(data)]) // don't do this
+```
+
+**Every non-primitive in a dependency array is a potential bug.** This applies equally to objects you create inside the component AND to props passed from the parent. The parent may re-render for unrelated reasons and pass a new reference each time. The fix is to stabilize at the source, destructure to primitives, or accept the trade-off when the effect is cheap and idempotent.
 
 The same applies to **function dependencies** — a function defined inside a component is a new reference every render. Use `useCallback` to stabilize it, move it inside the effect, or hoist it outside the component. See `references/anti-patterns.md` for detailed examples.
 
