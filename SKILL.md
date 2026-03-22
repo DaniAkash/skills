@@ -9,232 +9,237 @@ useEffect exists for one purpose: **synchronizing a component with an external s
 
 Most useEffect usage in the wild is compensating for something React already gives you better primitives for: derived state, event handlers, data-fetching abstractions, and component identity via keys.
 
-This matters even more when agents are writing code. useEffect is often added "just in case," but that impulse is the seed of the next race condition, infinite loop, or cascading re-render chain.
-
 ## The Decision Flowchart
 
 Before writing `useEffect`, walk through this:
 
 1. **Are you computing a value from props or state?**
-   Do not store it in state. Do not sync it with an effect. Compute it inline during render. If it is expensive, wrap it in `useMemo`.
+   Compute it inline during render. If expensive, wrap in `useMemo`.
 
 2. **Are you responding to a user interaction?**
-   Put the logic in the event handler. Effects run because a component rendered, not because the user did something. These are different things.
+   Put the logic in the event handler. Effects run because a component rendered, not because the user did something.
 
 3. **Are you fetching data?**
-   Use a data-fetching library (TanStack Query, SWR) or React's `use` hook with Suspense. Raw useEffect fetching creates race conditions and reimplements caching badly.
+   Use a data-fetching library (TanStack Query, SWR) or React's `use` hook with Suspense.
 
 4. **Are you resetting state when a prop changes?**
-   Use React's `key` prop to force a clean remount. The component gets a fresh identity and all state resets automatically.
+   Use React's `key` prop to force a clean remount.
 
 5. **Are you subscribing to an external data source?**
-   Use `useSyncExternalStore`. It is purpose-built for this and handles server rendering correctly.
+   Use `useSyncExternalStore`.
 
 6. **Are you synchronizing with a browser API, third-party widget, or external system?**
    This is what useEffect is for. Use it with proper cleanup.
 
 If you reached step 6, useEffect is the right tool. Otherwise, there is a better pattern.
 
-## The Five Anti-Patterns
-
-These are the most common misuses of useEffect. Each one has a better alternative. For detailed code examples of all five, read `references/anti-patterns.md`.
+## The Anti-Patterns
 
 ### 1. Derived State via Effects
 
-Setting state inside an effect based on other state or props. This causes a double render — first with stale values, then with the "synced" values — and creates state drift when dependencies are missed.
+Setting state inside an effect based on other state or props causes a double render and creates state drift.
 
 ```tsx
-// Never do this
+// BAD — two render cycles, state drift risk
 const [filtered, setFiltered] = useState([])
 useEffect(() => {
   setFiltered(items.filter(i => i.active))
 }, [items])
 
-// Compute inline instead
+// GOOD — compute inline, single render
 const filtered = items.filter(i => i.active)
 ```
 
 ### 2. Data Fetching in Effects
 
-Calling fetch inside useEffect without cancellation, caching, or deduplication. Every component instance runs its own fetch. Fast navigation causes race conditions where old responses overwrite new ones.
+Raw useEffect fetching has no cancellation, no caching, no deduplication, and race conditions when the dep changes quickly.
 
 ```tsx
-// Fragile — race conditions, no caching
+// BAD — race conditions, no caching
 useEffect(() => {
   fetch(`/api/user/${id}`).then(r => r.json()).then(setUser)
 }, [id])
 
-// Use a data library instead
+// GOOD — data library handles everything
 const { data: user } = useQuery(['user', id], () => fetchUser(id))
 ```
 
 ### 3. Event Responses via Effects
 
-Using state as a flag so an effect can "react" to a user action. The state is a relay — the real work belongs in the handler.
+If a side effect is caused by a user action, it belongs in the event handler, not relayed through state + effect.
 
 ```tsx
-// The submitted flag is just a relay
+// BAD — flag relay
 const [submitted, setSubmitted] = useState(false)
 useEffect(() => {
   if (submitted) { postForm(); setSubmitted(false) }
 }, [submitted])
 
-// Do it directly
+// GOOD — direct
 function handleSubmit() { postForm() }
 ```
 
 ### 4. Resetting State on Prop Change
 
-Watching a prop in an effect and calling setState to "reset" — this is lifecycle thinking from class components.
+Use React's `key` prop. When key changes, React destroys and recreates the component with fresh state.
 
 ```tsx
-// Effect resets state when userId changes
-useEffect(() => { setComment('') }, [userId])
+// BAD — manual reset, must remember every piece of state
+useEffect(() => { setDraft(''); setAttachments([]) }, [noteId])
 
-// Use key instead — React handles it
-<ProfileEditor key={userId} userId={userId} />
+// GOOD — React handles it
+<NoteEditor key={noteId} noteId={noteId} />
 ```
 
 ### 5. Effect Chains
 
-Multiple effects where one sets state that triggers another, creating a cascade of re-renders and hard-to-trace control flow.
+Multiple effects where one sets state that triggers another. Consolidate into the event handler or derive values inline.
 
-Consolidate the logic into the event handler that starts the chain, or derive intermediate values inline. Read `references/anti-patterns.md` for the full pattern.
+For detailed code examples of all anti-patterns, read `references/anti-patterns.md`.
+
+## Non-Primitive Dependencies
+
+When you put an object, array, or function in a dependency array, the effect re-runs on every render because React uses `Object.is` (reference comparison). A new object with the same contents is still a different reference.
+
+```tsx
+// BUG: options is a new object every render → effect runs every render
+const options = { animate: true, color: 'blue' }
+useEffect(() => { renderChart(options) }, [options])
+```
+
+### Fix: Stabilize at the source
+
+The best fix is to stabilize references where they are created — in the parent.
+
+```tsx
+// Parent memoizes, child's deps array just works
+function Parent() {
+  const data = useMemo(() => transform(raw), [raw])
+  return <Chart data={data} animate={true} color="blue" />
+}
+function Chart({ data, animate, color }: Props) {
+  useEffect(() => { renderChart(data, { animate, color }) }, [data, animate, color])
+}
+```
+
+### Fix: Destructure to primitives
+
+When you can't control the parent, pull primitive fields out of object props.
+
+```tsx
+function Chart({ config }: { config: ChartConfig }) {
+  const { animate, color } = config
+  useEffect(() => { init({ animate, color }) }, [animate, color])
+}
+```
+
+### Fix: Hoist constants
+
+For truly static values, move them to module scope.
+
+```tsx
+const OPTIONS = { animate: true, color: 'blue' } as const
+function Chart() {
+  useEffect(() => { init(OPTIONS) }, [])
+}
+```
+
+### Do NOT narrow dependencies just to avoid non-primitives
+
+This is a critical mistake. If your effect reads an entire array or object, do not replace it with `.length` or a single property just to make the dependency primitive. The effect will become stale — it will miss changes where the contents change but the surrogate value stays the same.
+
+```tsx
+// BAD — stale! If notification contents change but length stays the same, effect is stale
+useEffect(() => {
+  notifications.forEach(n => scheduleTimer(n))
+}, [notifications.length]) // WRONG: reads full array, depends only on length
+
+// GOOD — if the effect reads the full array, depend on the full array
+// Accept the trade-off: the effect may re-run when the parent creates a new reference
+// If that's too expensive, restructure the logic or stabilize in the parent
+useEffect(() => {
+  notifications.forEach(n => scheduleTimer(n))
+}, [notifications])
+```
+
+The dependency array must honestly reflect what the effect reads. When that creates a non-primitive dependency, the correct response is to stabilize the reference (parent memoizes, useCallback, etc.) — not to lie about what the effect depends on.
+
+### Do NOT use JSON.stringify in deps
+
+```tsx
+// ANTIPATTERN — runs every render, breaks on non-serializable data, order-sensitive
+const stableData = useMemo(() => data, [JSON.stringify(data)])
+```
+
+## Callback Props in Effects
+
+Callback props (`onDismiss`, `onSubmit`, `onChange`) are functions — they are non-primitive and get a new reference every render unless the parent wraps them in `useCallback`. This is one of the most common sources of unnecessary effect re-runs.
+
+**If your effect calls a callback prop, you must handle it explicitly.**
+
+```tsx
+// BAD — onDismiss is a new function every render if parent doesn't useCallback it
+// This effect re-fires every render, restarting all timers
+useEffect(() => {
+  const timer = setTimeout(() => onDismiss(id), 5000)
+  return () => clearTimeout(timer)
+}, [id, onDismiss]) // onDismiss is unstable
+
+// GOOD — use a ref to read the latest callback without adding it to deps
+function useLatestCallback<T extends (...args: never[]) => unknown>(fn: T): T {
+  const ref = useRef(fn)
+  ref.current = fn
+  return useCallback((...args: Parameters<T>) => ref.current(...args), []) as T
+}
+
+function AutoDismiss({ id, onDismiss }: Props) {
+  const stableDismiss = useLatestCallback(onDismiss)
+  useEffect(() => {
+    const timer = setTimeout(() => stableDismiss(id), 5000)
+    return () => clearTimeout(timer)
+  }, [id, stableDismiss]) // stableDismiss never changes
+}
+
+// ALSO GOOD — useEffectEvent (experimental, check React docs for status)
+import { useEffectEvent } from 'react'
+function AutoDismiss({ id, onDismiss }: Props) {
+  const handleDismiss = useEffectEvent(() => onDismiss(id))
+  useEffect(() => {
+    const timer = setTimeout(handleDismiss, 5000)
+    return () => clearTimeout(timer)
+  }, [id]) // handleDismiss is not a dependency
+}
+
+// ALSO GOOD — move the callback call into the parent's event flow
+// Instead of the child auto-dismissing via a timer effect,
+// the parent can own the timer logic and call its own function
+```
+
+This applies to any callback prop: `onDismiss`, `onSubmit`, `onComplete`, `onError`, `onChange`. If it appears in your effect's dependency array and you don't control the parent, stabilize it.
 
 ## When useEffect IS Correct
 
-useEffect is the right tool for synchronizing with external systems. Read `references/correct-usage.md` for detailed patterns including cleanup, race condition prevention, and dependency best practices.
+useEffect is the right tool for synchronizing with external systems:
 
-Legitimate uses:
-- **DOM manipulation**: Focus, scroll, measuring layout (use `useLayoutEffect` if measurement must happen before paint)
+- **DOM manipulation**: Focus, scroll, measuring layout (`useLayoutEffect` for pre-paint measurement)
 - **Subscriptions**: WebSocket connections, browser event listeners, Intersection Observer
 - **Third-party widgets**: Map libraries, video players, chart libraries with imperative APIs
-- **Analytics**: Page view tracking, telemetry that runs because the component was displayed
+- **Analytics**: Page view tracking that runs because the component was displayed
 - **Timers**: Intervals and timeouts tied to the component lifecycle
 
-## Modern Alternatives Reference
-
-React 19 introduced hooks that eliminate even more useEffect use cases. Read `references/modern-alternatives.md` for:
-- `use` — read Promises during render with Suspense
-- `useOptimistic` — optimistic UI without manual pending state
-- `useActionState` — form submission with built-in isPending
-- `useEffectEvent` — stable callbacks in effects without dependency churn
-- `useSyncExternalStore` — subscribe to external stores
-- `useTransition` / `useDeferredValue` — non-blocking state updates
-
-## Critical Gotcha: Non-Primitive Dependencies
-
-This is one of the most insidious useEffect bugs. When you put an object, array, or function in a dependency array, the effect re-runs on every render — even if the value is semantically identical — because React uses `Object.is` comparison, and non-primitives get new references on every render.
-
-```tsx
-// BUG: both data (array) and options (object) are non-primitives
-// → new references every render → effect runs every render
-function Chart({ data }: { data: DataPoint[] }) {
-  const options = { animate: true, color: 'blue' }
-
-  useEffect(() => {
-    renderChart(data, options)
-  }, [data, options]) // BOTH are new references every render
-}
-```
-
-This is especially dangerous because:
-- It looks correct — you included all dependencies as the linter tells you to
-- It silently causes infinite re-renders or wasted work
-- The bug is invisible until you hit performance issues or infinite loops
-- **Props that are objects or arrays are just as dangerous** — the parent may pass a new reference on every render even if the contents haven't changed
-- Inline objects, arrays, and arrow functions created during render are new references every time
-
-### The Real Fix: Stabilize at the Source
-
-The best fix is almost always to **stabilize references where they are created** — in the parent — rather than working around unstable references in the consumer. If the parent memoizes its data, the child's standard deps array just works.
-
-```tsx
-// PARENT: stabilize the data before passing it down
-function Dashboard() {
-  const data = useMemo(() => computeChartData(rawData), [rawData])
-  return <Chart data={data} animate={true} color="blue" />
-}
-
-// CHILD: standard deps array works because parent provides a stable reference
-function Chart({ data, animate, color }: ChartProps) {
-  useEffect(() => {
-    renderChart(data, { animate, color })
-  }, [data, animate, color]) // data is stable from parent, animate/color are primitives
-}
-```
-
-When you control the parent, this is always the cleanest solution — no refs, no tricks, no fighting the dependency system.
-
-### When You Don't Control the Parent
-
-If you're writing a reusable component and can't guarantee the parent will memoize:
-
-```tsx
-// Destructure object props to primitive values in the dependency array
-function Chart({ config }: { config: { animate: boolean; color: string } }) {
-  const { animate, color } = config
-  useEffect(() => {
-    renderChart({ animate, color })
-  }, [animate, color]) // primitives — stable comparison
-}
-
-// For array/object props that feed an imperative API, use separate effects
-function Chart({ data, animate, color }: ChartProps) {
-  const chartRef = useRef<ChartInstance | null>(null)
-
-  // Init once — animate and color captured at creation time
-  useEffect(() => {
-    chartRef.current = createChart({ animate, color })
-    return () => { chartRef.current?.destroy() }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Update data via the library's imperative API
-  // data is non-primitive, so this effect may run more than needed,
-  // but setData is cheap and idempotent — a reasonable trade-off
-  useEffect(() => {
-    chartRef.current?.setData(data)
-  }, [data])
-}
-```
-
-### Hoist constants outside the component
-
-For values that are truly static, move them to module scope so they are the same reference across all renders:
-
-```tsx
-const DEFAULT_OPTIONS = { animate: true, color: 'blue' } as const
-
-function Chart({ data }: { data: DataPoint[] }) {
-  useEffect(() => {
-    renderChart(data, DEFAULT_OPTIONS)
-  }, [data]) // DEFAULT_OPTIONS is a module constant — always the same reference
-}
-```
-
-### What NOT to do
-
-Do not use `JSON.stringify` in dependency arrays to "stabilize" non-primitives:
-
-```tsx
-// ANTIPATTERN: JSON.stringify runs every render, breaks on non-serializable data,
-// and is order-sensitive for objects
-const stableData = useMemo(() => data, [JSON.stringify(data)]) // don't do this
-```
-
-**Every non-primitive in a dependency array is a potential bug.** This applies equally to objects you create inside the component AND to props passed from the parent. The parent may re-render for unrelated reasons and pass a new reference each time. The fix is to stabilize at the source, destructure to primitives, or accept the trade-off when the effect is cheap and idempotent.
-
-The same applies to **function dependencies** — a function defined inside a component is a new reference every render. Use `useCallback` to stabilize it, move it inside the effect, or hoist it outside the component. See `references/anti-patterns.md` for detailed examples.
+For detailed patterns including cleanup, race conditions, and dependency best practices, read `references/correct-usage.md`.
 
 ## Rules for Writing Effects Correctly
 
-When you do need useEffect, follow these rules:
-
 1. **Always include cleanup** for subscriptions, timers, and listeners
 2. **Never lie about dependencies** — include every value from the render scope that the effect reads
-3. **Never put non-primitive values directly in dependency arrays** — objects, arrays, and functions get new references every render. Destructure to primitives, hoist constants, or stabilize with `useMemo`/`useCallback`
+3. **Stabilize non-primitives** — don't put raw objects, arrays, or callback props in deps. Stabilize at the source (parent memoizes), destructure to primitives, use refs for callbacks, or accept the trade-off when the effect is cheap and idempotent
 4. **Handle race conditions** in async effects with a cleanup flag (`let ignore = false`)
 5. **Use functional state updates** — `setCount(c => c + 1)` removes the dependency on `count`
 6. **Use `useReducer`** when multiple state variables interact inside an effect — dispatch is always stable
-7. **Move functions inside effects** if they are only used by that effect, to make dependencies explicit
+7. **Move functions inside effects** if they are only used by that effect
 8. **Use `useEffectEvent`** (when available) to extract non-reactive logic from effects
+
+## Modern Alternatives
+
+React 19 introduced hooks that eliminate even more useEffect use cases. Read `references/modern-alternatives.md` for `use`, `useOptimistic`, `useActionState`, `useEffectEvent`, `useSyncExternalStore`, `useTransition`, and `useDeferredValue`.
