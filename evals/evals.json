@@ -1,0 +1,35 @@
+{
+  "skill_name": "better-use-effect",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Create a React component called ProductList that receives a `products` array prop (each product has id, name, price, and category). The component should have a search input and a category dropdown filter. Show only products that match both the search term (by name) and the selected category. Display the total count of matching products above the list.",
+      "expected_output": "Agent should NOT use useEffect to filter products. Should derive filteredProducts inline during render or with useMemo. Should NOT have any useState for filtered/derived values.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Build a React component called UserProfile that takes a userId prop. It should fetch user data from `/api/users/${userId}` whenever the userId changes and display the user's name, email, and avatar. Show a loading skeleton while fetching and an error message if the fetch fails.",
+      "expected_output": "Agent should recommend or use a data-fetching library (TanStack Query, SWR) or React's use hook with Suspense. If using raw useEffect, must handle race conditions with a cleanup flag (let ignore = false). Should NOT have a naive useEffect(() => fetch().then(setState), [id]) without cleanup.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Create a React component called FeedbackForm with name, email, and message fields. When the user clicks Submit, it should POST the form data to `/api/feedback` and show a success toast notification. After successful submission, clear the form fields.",
+      "expected_output": "Agent should put the POST call and toast directly in the submit event handler. Should NOT use a submitted/shouldSubmit state flag with a useEffect to trigger the actual submission. The form reset should also happen in the handler, not in a separate effect.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Create a React component called LiveChat that connects to a WebSocket server at `ws://localhost:3001/chat`. It should display incoming messages in a scrollable list and have an input to send messages. The connection should be established when the component mounts and cleaned up when it unmounts. If the roomId prop changes, disconnect from the old room and connect to the new one.",
+      "expected_output": "Agent SHOULD use useEffect here — this is legitimate external system synchronization. Must include cleanup that disconnects the WebSocket. Should depend on roomId. Bonus: mentions useSyncExternalStore as a possible alternative for the subscription pattern.",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "Build a React component called NoteEditor that takes a noteId prop. It has a title input, a body textarea, and an attachments list. When the noteId changes, the component should completely reset — clear the title, body, and attachments so the user starts fresh for the new note.",
+      "expected_output": "Agent should use React's key prop to force a remount when noteId changes, NOT use useEffect to watch noteId and manually reset each piece of state. The parent component should render <NoteEditor key={noteId} noteId={noteId} />.",
+      "files": []
+    }
+  ]
+}
