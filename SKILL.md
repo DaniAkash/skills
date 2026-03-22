@@ -122,13 +122,55 @@ React 19 introduced hooks that eliminate even more useEffect use cases. Read `re
 - `useSyncExternalStore` — subscribe to external stores
 - `useTransition` / `useDeferredValue` — non-blocking state updates
 
+## Critical Gotcha: Non-Primitive Dependencies
+
+This is one of the most insidious useEffect bugs. When you put an object, array, or function in a dependency array, the effect re-runs on every render — even if the value is semantically identical — because React uses `Object.is` comparison, and non-primitives get new references on every render.
+
+```tsx
+// BUG: options is a new object every render → effect runs every render → infinite loop
+function Chart({ data }: { data: DataPoint[] }) {
+  const options = { animate: true, color: 'blue' }
+
+  useEffect(() => {
+    renderChart(data, options)
+  }, [data, options]) // options is NEVER the same reference twice
+}
+```
+
+This is especially dangerous because:
+- It looks correct — you included all dependencies as the linter tells you to
+- It silently causes infinite re-renders or wasted work
+- The bug is invisible until you hit performance issues or infinite loops
+- Inline objects, arrays, and arrow functions created during render are new references every time
+
+**Fixes:**
+
+```tsx
+// Fix 1: Extract primitive values from the object
+useEffect(() => {
+  renderChart(data, { animate, color })
+}, [data, animate, color]) // primitives — stable comparison
+
+// Fix 2: Hoist the constant outside the component
+const OPTIONS = { animate: true, color: 'blue' } // stable reference
+function Chart({ data }: { data: DataPoint[] }) {
+  useEffect(() => { renderChart(data, OPTIONS) }, [data])
+}
+
+// Fix 3: useMemo to stabilize the reference
+const options = useMemo(() => ({ animate, color }), [animate, color])
+useEffect(() => { renderChart(data, options) }, [data, options])
+```
+
+The same applies to **function dependencies** — a function defined inside a component is a new reference every render. Use `useCallback` to stabilize it, move it inside the effect, or hoist it outside the component. See `references/anti-patterns.md` for detailed examples.
+
 ## Rules for Writing Effects Correctly
 
 When you do need useEffect, follow these rules:
 
 1. **Always include cleanup** for subscriptions, timers, and listeners
 2. **Never lie about dependencies** — include every value from the render scope that the effect reads
-3. **Use primitive dependencies** — `[user.id]` not `[user]` — to avoid unnecessary re-runs
+3. **Never put non-primitive values directly in dependency arrays** — objects, arrays, and functions get new references every render. Destructure to primitives, hoist constants, or stabilize with `useMemo`/`useCallback`
 4. **Handle race conditions** in async effects with a cleanup flag (`let ignore = false`)
 5. **Use functional state updates** — `setCount(c => c + 1)` removes the dependency on `count`
 6. **Use `useReducer`** when multiple state variables interact inside an effect — dispatch is always stable

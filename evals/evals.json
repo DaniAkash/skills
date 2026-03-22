@@ -3,66 +3,71 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "Create a React component called ProductList that receives a `products` array prop (each product has id, name, price, and category). The component should have a search input and a category dropdown filter. Show only products that match both the search term (by name) and the selected category. Display the total count of matching products above the list.",
-      "expected_output": "Agent should NOT use useEffect to filter products. Should derive filteredProducts inline during render or with useMemo. Should NOT have any useState for filtered/derived values.",
+      "prompt": "Create a React component called DataGrid that receives a `rows` prop (array of objects) and a `config` prop (object with fields: sortField, sortDirection, pageSize). The component should display the rows sorted and paginated according to the config. It also has a search input for filtering rows by any field. When the config changes, the grid should re-sort and re-paginate. When search changes, reset to page 1.",
+      "expected_output": "Agent should derive sorted/filtered/paginated data inline during render, NOT use useEffect to sync derived state. Critical: if config is used in any useEffect dependency array, the agent must recognize it as a non-primitive and handle it correctly (destructure to primitives or useMemo). Should NOT have separate useState for filtered/sorted/paginated data.",
       "files": [],
       "assertions": [
-        "No useEffect used for filtering or deriving the filtered product list",
-        "Filtered products are computed inline during render (not stored in separate useState)",
-        "Component has a search input with controlled state",
-        "Component has a category filter dropdown",
-        "Displays count of matching products"
+        "No useEffect used for sorting, filtering, or paginating data",
+        "Sorted/filtered/paginated data is derived inline (useMemo or inline computation)",
+        "Config prop is NOT placed directly in any useEffect dependency array as an object",
+        "Search input resets pagination to page 1 without useEffect",
+        "Has working search, sort, and pagination"
       ]
     },
     {
       "id": 2,
-      "prompt": "Build a React component called UserProfile that takes a userId prop. It should fetch user data from `/api/users/${userId}` whenever the userId changes and display the user's name, email, and avatar. Show a loading skeleton while fetching and an error message if the fetch fails.",
-      "expected_output": "Agent should recommend or use a data-fetching library (TanStack Query, SWR) or React's use hook with Suspense. If using raw useEffect, must handle race conditions with a cleanup flag.",
+      "prompt": "Build a React component called AutoSaveForm that auto-saves form data to the server 2 seconds after the user stops typing. The component has title and body fields, receives a documentId prop, and should POST to `/api/documents/${documentId}`. Show a 'Saving...' indicator while the save is in flight and 'Saved' when complete. When documentId changes, the form should reset completely. Also track whether the form has unsaved changes by comparing current values to the last saved values.",
+      "expected_output": "Tricky combo: the debounced auto-save needs a timer (useEffect or ref-based), the documentId reset should use key prop, and the 'unsaved changes' indicator should be derived state (not synced via effect). Agent should NOT use useEffect to detect changes between current and saved values. Should NOT use useEffect to reset form on documentId change.",
       "files": [],
       "assertions": [
-        "Uses a data-fetching library OR handles race conditions with cleanup flag",
-        "No naive useEffect fetch without race condition handling",
-        "Shows loading state while fetching",
-        "Shows error state on failure",
-        "Displays user name, email, and avatar"
+        "documentId change resets form via key prop (not useEffect watching documentId)",
+        "Unsaved changes indicator is derived by comparing current values to saved values (not synced via useEffect)",
+        "Auto-save uses a timer/debounce mechanism (useEffect with cleanup for the timeout is acceptable here)",
+        "No non-primitive values (objects/arrays) placed directly in useEffect dependency arrays",
+        "Shows Saving/Saved indicator"
       ]
     },
     {
       "id": 3,
-      "prompt": "Create a React component called FeedbackForm with name, email, and message fields. When the user clicks Submit, it should POST the form data to `/api/feedback` and show a success toast notification. After successful submission, clear the form fields.",
-      "expected_output": "Agent should put the POST call and toast directly in the submit handler. Should NOT use a submitted state flag with useEffect.",
+      "prompt": "Create a React component called NotificationCenter that receives a `notifications` prop (array of {id, message, type, timestamp}) and an `onDismiss` callback prop. Requirements: 1) Show a badge with count of unread notifications, 2) When a new notification arrives (the array grows), play a sound effect by calling playNotificationSound(), 3) Auto-dismiss 'info' type notifications after 5 seconds, 4) Let user manually dismiss any notification via the onDismiss callback, 5) Sort notifications by timestamp descending.",
+      "expected_output": "The 'play sound when new notification arrives' is the trap — agents will want to useEffect watching notifications.length or the array. But notifications is a non-primitive prop that changes reference. The sorted list should be derived. Auto-dismiss needs a timer (legitimate effect). The sound effect should ideally be handled by detecting the actual new notification rather than watching array length in an effect.",
       "files": [],
       "assertions": [
-        "POST call happens directly in the submit event handler",
-        "No useEffect watching a submitted flag to trigger POST",
-        "Form fields cleared in handler, not in effect",
-        "Shows success toast after submission",
-        "Has name, email, and message fields"
+        "Sorted notifications are derived inline (not synced via useEffect + setState)",
+        "Unread count is derived inline (not stored in separate state synced by effect)",
+        "notifications array prop is NOT placed directly in a useEffect dependency array",
+        "onDismiss callback prop is NOT placed directly in a useEffect dependency array (or is stabilized)",
+        "Auto-dismiss timer uses useEffect with proper cleanup (legitimate use)",
+        "Sound playback does not cause infinite loops from non-primitive dependency"
       ]
     },
     {
       "id": 4,
-      "prompt": "Create a React component called LiveChat that connects to a WebSocket server at `ws://localhost:3001/chat`. It should display incoming messages in a scrollable list and have an input to send messages. The connection should be established when the component mounts and cleaned up when it unmounts. If the roomId prop changes, disconnect from the old room and connect to the new one.",
-      "expected_output": "Agent SHOULD use useEffect here — legitimate external system synchronization. Must include cleanup and roomId dependency.",
+      "prompt": "Build a React component called ChatRoom that receives roomId (string), user (object with id and name), and connectionOptions (object with reconnectInterval and maxRetries). The component should: 1) Connect to a WebSocket at `ws://localhost:3001/rooms/${roomId}`, 2) Send a join message with user info on connect, 3) Display incoming messages, 4) Reconnect automatically with the configured retry logic if disconnected, 5) Disconnect and reconnect when roomId changes, 6) Show connection status (connecting/connected/disconnected).",
+      "expected_output": "The WebSocket connection IS a legitimate useEffect use case. But the trap is the user and connectionOptions props — they are objects and MUST NOT go directly into the dependency array. The agent should destructure user.id, user.name and connectionOptions.reconnectInterval, connectionOptions.maxRetries as primitives, or use refs to read latest values without adding them as deps.",
       "files": [],
       "assertions": [
         "Uses useEffect for WebSocket connection (correct use case)",
-        "useEffect includes cleanup that closes the WebSocket",
-        "Dependency array includes roomId",
-        "Has message input and send functionality",
-        "Displays incoming messages in a list"
+        "useEffect has proper cleanup that closes WebSocket",
+        "user object is NOT placed directly in useEffect dependency array",
+        "connectionOptions object is NOT placed directly in useEffect dependency array",
+        "roomId (primitive) IS in the dependency array",
+        "Shows connection status (connecting/connected/disconnected)",
+        "Has reconnection logic"
       ]
     },
     {
       "id": 5,
-      "prompt": "Build a React component called NoteEditor that takes a noteId prop. It has a title input, a body textarea, and an attachments list. When the noteId changes, the component should completely reset — clear the title, body, and attachments so the user starts fresh for the new note.",
-      "expected_output": "Agent should use React's key prop to force remount, NOT useEffect to watch noteId and reset state.",
+      "prompt": "Create a React component called ShoppingCart that manages a cart with these features: 1) Receives a `products` array prop and a `discountRules` object prop ({minItems, percentage, freeShippingThreshold}), 2) User can add/remove products and change quantities, 3) Display subtotal, discount amount (applied when item count >= minItems), shipping cost ($10 unless subtotal >= freeShippingThreshold, then free), and final total, 4) When the total exceeds $100, show a 'Premium Order' badge, 5) When the user changes quantity to 0, auto-remove that item, 6) Persist the cart to localStorage whenever it changes.",
+      "expected_output": "Nearly everything here should be derived state: subtotal, discount, shipping, total, premium badge. The localStorage persistence is a legitimate useEffect. The trap: discountRules is a non-primitive prop — if used in useEffect deps, it will fire every render. Auto-removing zero-quantity items should happen in the event handler, not via an effect watching quantities. The agent should NOT use useEffect for calculating subtotal/discount/shipping/total.",
       "files": [],
       "assertions": [
-        "Uses key prop to force remount on noteId change",
-        "Does NOT use useEffect to watch noteId and reset state",
-        "Has title input, body textarea, and attachments list",
-        "Separates parent (with key) from editor (with state)"
+        "Subtotal, discount, shipping cost, and total are derived inline (not synced via useEffect)",
+        "Premium badge is derived from total (not stored in state synced by effect)",
+        "Zero-quantity removal happens in the event handler (not via useEffect watching cart items)",
+        "localStorage persistence uses useEffect (legitimate) with proper serialization",
+        "discountRules prop is NOT placed directly in useEffect dependency array",
+        "No useEffect chains where one effect's state change triggers another effect"
       ]
     }
   ]
