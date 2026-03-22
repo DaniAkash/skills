@@ -3,72 +3,71 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "Build a React component called AutoSaveForm that auto-saves form data to the server 2 seconds after the user stops typing. The component has title and body fields, receives a documentId prop, and should POST to `/api/documents/${documentId}`. Show a 'Saving...' indicator while the save is in flight and 'Saved' when complete. When documentId changes, the form should reset completely. Also track whether the form has unsaved changes by comparing current values to the last saved values.",
-      "expected_output": "documentId reset via key prop, unsaved changes derived inline, debounce timer is legitimate useEffect, no non-primitive deps",
+      "prompt": "Build a React component called AutoSaveEditor that receives a documentId prop and loads/saves document data. It has title and body text fields. It should auto-save to `/api/documents/${documentId}` two seconds after the user stops typing. Show save status (saving/saved/unsaved). When switching documents, the editor should start fresh. Track whether the current form has unsaved changes.",
+      "expected_output": "key prop for document switch, derived unsaved indicator, debounce timer as legitimate effect, no object state in deps",
       "files": [],
       "assertions": [
         "documentId change resets form via key prop (not useEffect watching documentId)",
-        "Unsaved changes indicator is derived by comparing current values to saved values (not synced via useEffect)",
-        "Auto-save uses a timer/debounce mechanism with cleanup",
-        "No non-primitive values placed directly in useEffect dependency arrays",
-        "Shows Saving/Saved indicator"
+        "Unsaved changes is derived by comparing current values to saved values (not synced via useEffect)",
+        "Debounce timer uses useEffect with cleanup (legitimate)",
+        "No object or array values in any useEffect dependency array (including local state objects like lastSaved/savedData)",
+        "Shows save status indicator"
       ]
     },
     {
       "id": 2,
-      "prompt": "Create a React component called TagManager that receives a `tags` prop (array of {id, label, color}) and an `onRemove` callback prop. Requirements: 1) Display tags sorted alphabetically by label, 2) When the set of tags changes (tags added or removed, or a tag's label/color changes), show a brief 'Tags updated' toast by calling showToast('Tags updated'), 3) Each tag has a remove button that calls onRemove(tag.id), 4) Show a count of total tags. Important: the parent component does NOT wrap onRemove in useCallback — it passes a fresh function reference every render.",
-      "expected_output": "The trap is twofold: (a) detecting tag changes must account for content changes, not just array length — using tags.length would miss label/color changes, (b) onRemove is an unstable callback that must be stabilized (ref or useEffectEvent) before being used in any effect. Sorted tags and count should be derived inline.",
+      "prompt": "Create a React component called PollManager that polls an API endpoint `/api/status` every 5 seconds using setInterval. It receives an onStatusChange callback prop and a pollingConfig prop ({interval, retryLimit}). When the status value changes between polls, call onStatusChange with the new status. Display the current status and a count of how many times the status has changed. Stop polling after retryLimit consecutive errors.",
+      "expected_output": "Interval is legitimate useEffect. onStatusChange callback must be stabilized (ref). pollingConfig is an object prop that must be destructured. Status change count should be derived or tracked correctly. The effect should not re-subscribe the interval when callbacks change.",
       "files": [],
       "assertions": [
-        "Sorted tags are derived inline (not synced via useEffect + setState)",
-        "Tag count is derived inline (not stored in separate state)",
-        "Change detection accounts for tag contents, not just array length",
-        "onRemove callback is stabilized before use in any effect (ref, useEffectEvent, or moved out of effect)",
-        "Toast is triggered appropriately when tags actually change",
-        "Remove button calls onRemove directly in click handler"
+        "Uses useEffect for setInterval (correct use case)",
+        "useEffect has cleanup that clears the interval",
+        "onStatusChange callback is stabilized via ref (not placed directly in deps)",
+        "pollingConfig object is destructured to primitives before use in deps",
+        "Interval does not restart when callback prop changes",
+        "Status change count is tracked correctly"
       ]
     },
     {
       "id": 3,
-      "prompt": "Create a React component called NotificationCenter that receives a `notifications` prop (array of {id, message, type, timestamp}) and an `onDismiss` callback prop. Requirements: 1) Show a badge with count of unread notifications, 2) When a new notification arrives (the array grows), play a sound effect by calling playNotificationSound(), 3) Auto-dismiss 'info' type notifications after 5 seconds, 4) Let user manually dismiss any notification via the onDismiss callback, 5) Sort notifications by timestamp descending. Important: the parent does NOT wrap onDismiss in useCallback.",
-      "expected_output": "Sorted list and count derived inline. Sound effect needs careful change detection. Auto-dismiss timers are legitimate useEffect. onDismiss must be stabilized (ref/useEffectEvent) since it's unstable from the parent. notifications array in deps is acceptable if the effect reads it, but notifications.length alone is NOT sufficient if the effect reads notification contents.",
+      "prompt": "Create a React component called ActivityFeed that receives an `events` prop (array of {id, type, message, timestamp}) and an `onAcknowledge` callback prop. Display events sorted by timestamp (newest first). When new events appear that weren't in the previous render, flash a notification banner for 3 seconds. Each event has an Acknowledge button that calls onAcknowledge(event.id). Show a count of unacknowledged events.",
+      "expected_output": "Sorted events and count are derived. New-event detection must compare current vs previous (not just length). The 3-second banner timer is legitimate useEffect. onAcknowledge only used in click handler should NOT be stabilized unnecessarily. If onAcknowledge is used in an effect it must be stabilized.",
       "files": [],
       "assertions": [
-        "Sorted notifications are derived inline (not synced via useEffect + setState)",
-        "Unread count is derived inline",
-        "onDismiss callback is stabilized before use in useEffect deps (ref, useEffectEvent, or equivalent)",
-        "Auto-dismiss timer uses useEffect with proper cleanup",
-        "Sound effect detection does not use a narrowed dependency that would miss content changes",
-        "Manual dismiss uses click handler directly"
+        "Sorted events are derived inline (not synced via useEffect + setState)",
+        "Unacknowledged count is derived inline",
+        "New-event detection compares against previous events (not just array length)",
+        "Banner timer uses useEffect with cleanup (legitimate)",
+        "onAcknowledge is called directly in click handler (not relayed through effect)",
+        "onAcknowledge is NOT unnecessarily stabilized if only used in event handlers"
       ]
     },
     {
       "id": 4,
-      "prompt": "Build a React component called ChatRoom that receives roomId (string), user (object with id and name), and connectionOptions (object with reconnectInterval and maxRetries). The component should: 1) Connect to a WebSocket at `ws://localhost:3001/rooms/${roomId}`, 2) Send a join message with user info on connect, 3) Display incoming messages, 4) Reconnect automatically with the configured retry logic if disconnected, 5) Disconnect and reconnect when roomId changes, 6) Show connection status (connecting/connected/disconnected). Important: the parent does NOT memoize user or connectionOptions objects.",
-      "expected_output": "WebSocket is legitimate useEffect. user and connectionOptions must NOT go directly in deps — destructure to primitives. roomId (primitive) in deps. Reconnect logic with retry count.",
+      "prompt": "Build a React component called SyncedFormPair. It receives a resourceId prop and a syncConfig prop ({debounceMs, endpoint}). It has two text fields: 'local notes' and 'shared notes'. Local notes are only stored locally. Shared notes auto-sync to `${syncConfig.endpoint}/${resourceId}` after debounceMs milliseconds of inactivity. Display a sync indicator (syncing/synced/out-of-sync). When resourceId changes, both fields should reset. Track the last-synced version to determine out-of-sync status.",
+      "expected_output": "key prop for resourceId reset. syncConfig must be destructured to primitives. The last-synced snapshot should be a ref (not object state in deps). Sync indicator derived from comparing current vs last-synced. Debounce is legitimate useEffect.",
       "files": [],
       "assertions": [
-        "Uses useEffect for WebSocket connection (correct use case)",
-        "useEffect has proper cleanup that closes WebSocket",
-        "user object is NOT placed directly in useEffect dependency array",
-        "connectionOptions object is NOT placed directly in useEffect dependency array",
-        "roomId (primitive) IS in the dependency array",
-        "Shows connection status",
-        "Has reconnection logic"
+        "resourceId change resets form via key prop",
+        "syncConfig object is destructured to primitives before use in deps",
+        "Last-synced snapshot uses ref (not object state placed in useEffect deps)",
+        "Out-of-sync indicator is derived by comparing current values to last-synced ref",
+        "Debounce timer uses useEffect with cleanup",
+        "No object or array values in any useEffect dependency array"
       ]
     },
     {
       "id": 5,
-      "prompt": "Create a React component called LiveDashboard that receives a `metrics` prop (array of {id, name, value, threshold}) and an `onAlert` callback prop. Requirements: 1) Display all metrics in a list showing name, value, and whether value exceeds threshold, 2) When any metric's value crosses its threshold (goes from below to above), call onAlert(metric.id, metric.name) to fire an alert, 3) Show a count of how many metrics are currently above their threshold, 4) Sort metrics by name alphabetically. Important: the parent recreates the metrics array and onAlert function on every render. The array may have the same length but different values between renders.",
-      "expected_output": "Count of exceeded metrics and sorted list should be derived. The threshold-crossing detection is the hard part — it needs to compare current values to previous values, not just check current state. The agent must not use metrics.length as a dependency surrogate. onAlert callback must be stabilized.",
+      "prompt": "Create a React component called MetricsMonitor that receives a metrics prop (array of {id, name, value, threshold}) and an onAlert callback prop. Display metrics sorted by name. Show how many are currently above threshold. When any metric crosses from below threshold to above it between renders, call onAlert(metricId, metricName). Each metric row has a Mute button that calls onAlert with a 'muted' flag.",
+      "expected_output": "Sorted list and count are derived. Threshold crossing needs previous-value tracking via ref. onAlert must be stabilized for the crossing-detection effect but should be called directly (not stabilized) for the Mute button click handler.",
       "files": [],
       "assertions": [
-        "Sorted metrics are derived inline",
-        "Count of exceeded metrics is derived inline",
-        "Threshold-crossing detection compares current vs previous values (not just current state)",
-        "metrics array is handled correctly in deps (not narrowed to .length when contents matter)",
-        "onAlert callback is stabilized before use in effects",
-        "Alert fires only on threshold crossing (below→above), not on every render where value > threshold"
+        "Sorted metrics derived inline",
+        "Count of exceeded metrics derived inline",
+        "Threshold crossing compares current vs previous values via ref",
+        "onAlert is stabilized (ref) for use in the crossing-detection effect",
+        "onAlert is called directly in the Mute button click handler (not unnecessarily stabilized for event-only usage)",
+        "Alert fires only on crossing (below→above), not on every render where value > threshold"
       ]
     }
   ]
