@@ -9,7 +9,7 @@ useEffect exists for one purpose: **synchronizing a component with an external s
 
 ## Decision Flowchart
 
-Before writing `useEffect`:
+Before writing `useEffect`, walk through these questions in order — stop at the first match. See `references/decision-flowchart.md` for expanded examples of each case.
 
 1. **Computing a value from props or state?** → Compute inline. Use `useMemo` if expensive.
 2. **Responding to a user interaction?** → Event handler.
