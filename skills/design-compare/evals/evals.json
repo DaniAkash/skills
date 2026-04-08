@@ -1,0 +1,68 @@
+{
+  "skill_name": "design-compare",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I have a design mockup at evals/test-images/reference_dashboard.png and my implementation screenshot at evals/test-images/implementation_dashboard.png. Can you compare them and tell me what's different? I need to know exactly which areas don't match so I can fix my CSS.",
+      "expected_output": "Agent runs ImageMagick comparison, produces diff images, reads the report, and identifies specific differences (color shifts, spacing changes, alignment issues) with actionable feedback on what to fix.",
+      "files": [
+        "evals/test-images/reference_dashboard.png",
+        "evals/test-images/implementation_dashboard.png"
+      ],
+      "expectations": [
+        "Uses ImageMagick magick compare command (not just visual inspection)",
+        "Produces a highlighted diff image showing red pixels where images differ",
+        "Reports a numerical difference percentage",
+        "Identifies specific visual differences (color, spacing, alignment)",
+        "Provides actionable CSS/layout fix suggestions based on the diff"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Compare these two dark-themed UI screenshots. The reference design is at evals/test-images/reference_dark_ui.png and my current build is at evals/test-images/implementation_dark_ui.png. The sidebar width looks off but I'm not sure what else changed. Run a visual diff and give me the full breakdown.",
+      "expected_output": "Agent runs comparison, handles the dark background appropriately, identifies sidebar width difference and any other layout shifts, and provides metrics.",
+      "files": [
+        "evals/test-images/reference_dark_ui.png",
+        "evals/test-images/implementation_dark_ui.png"
+      ],
+      "expectations": [
+        "Uses ImageMagick magick compare command",
+        "Produces diff output images (highlighted, side-by-side, or overlay)",
+        "Reports numerical metrics (AE pixel count or difference percentage)",
+        "Identifies the sidebar width difference as a key issue",
+        "Suggests specific layout fixes for the identified differences"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "I just pushed a CSS fix. Can you compare evals/test-images/reference_dashboard.png against evals/test-images/reference_identical.png to verify my implementation now matches the design? I want to make sure there are zero visual differences.",
+      "expected_output": "Agent runs comparison, finds 0% difference, reports PASS status, confirms the images are identical.",
+      "files": [
+        "evals/test-images/reference_dashboard.png",
+        "evals/test-images/reference_identical.png"
+      ],
+      "expectations": [
+        "Uses ImageMagick magick compare command",
+        "Reports 0% or near-0% difference",
+        "Clearly states the images match or are identical",
+        "Does not hallucinate differences that don't exist"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "My design mockup at evals/test-images/reference_placeholder_content.png uses placeholder text ('Lorem ipsum') but my actual app at evals/test-images/implementation_real_content.png has real content. The layout and styling should be identical — only the text content is different. Can you compare them and confirm the design implementation is correct despite the text differences?",
+      "expected_output": "Agent runs comparison, recognizes that the pixel diff is inflated by content text differences, uses SSIM to confirm structural similarity is high, and concludes the design is correctly implemented despite different text content.",
+      "files": [
+        "evals/test-images/reference_placeholder_content.png",
+        "evals/test-images/implementation_real_content.png"
+      ],
+      "expectations": [
+        "Uses ImageMagick magick compare command",
+        "Reports SSIM metric showing high structural similarity (> 0.95)",
+        "Recognizes that pixel differences are from text content, not layout or styling issues",
+        "Does not recommend layout or CSS fixes for areas that only differ in text content",
+        "Concludes the design implementation is correct or acceptable despite the content differences"
+      ]
+    }
+  ]
+}
