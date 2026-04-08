@@ -11,7 +11,7 @@ I ([@DaniAkash](https://github.com/DaniAkash)) use these skills daily in my own 
 | Skill | Evals | Iterations | Description |
 |-------|-------|------------|-------------|
 | [better-use-effect](skills/better-use-effect/SKILL.md) | 5 | 4 | Guides correct usage of React's `useEffect` hook — when to use it, when NOT to use it, and what modern alternatives exist. |
-| [design-compare](skills/design-compare/SKILL.md) | 3 | 1 | Visual diff comparison between two screenshots using ImageMagick — pixel-level diffing, structured metrics, and iterative design QA workflow. |
+| [design-compare](skills/design-compare/SKILL.md) | 4 | 2 | Visual diff comparison between two screenshots using ImageMagick — pixel-level diffing, SSIM structural similarity, and iterative design QA workflow. |
 
 ## How Skills Are Built
 
