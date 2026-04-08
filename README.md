@@ -8,21 +8,9 @@ I ([@DaniAkash](https://github.com/DaniAkash)) use these skills daily in my own 
 
 ## Available Skills
 
-| Skill | Evals | Iterations | Description |
-|-------|-------|------------|-------------|
-| [better-use-effect](skills/better-use-effect/SKILL.md) | 5 | 4 | Guides correct usage of React's `useEffect` hook — when to use it, when NOT to use it, and what modern alternatives exist. |
-
-### Install
-
-```bash
-npx skills add DaniAkash/skills --skill <skill-name>
-```
-
-For example:
-
-```bash
-npx skills add DaniAkash/skills --skill better-use-effect
-```
+| Skill | Install | Evals | Iterations | Description |
+|-------|---------|-------|------------|-------------|
+| [better-use-effect](skills/better-use-effect/SKILL.md) | `npx skills add DaniAkash/skills --skill better-use-effect` | 5 | 4 | Guides correct usage of React's `useEffect` hook — when to use it, when NOT to use it, and what modern alternatives exist. |
 
 ## How Skills Are Built
 
