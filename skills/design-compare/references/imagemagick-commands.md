@@ -181,6 +181,29 @@ magick image.png -crop 800x200+0+0 +repage cropped.png
 - Most intuitive metric — "N pixels are different"
 - Used for calculating difference percentage
 
+### SSIM (Structural Similarity Index)
+
+- Range: 0 (completely different) to 1 (identical)
+- Measures: Structural resemblance considering luminance, contrast, and structure
+- Particularly useful when text content differs but layout should match
+- ImageMagick outputs dissimilarity — the compare.sh script converts to SSIM (1 = identical)
+
+**Important note on ImageMagick's SSIM output:**
+ImageMagick's `-metric SSIM` actually outputs dissimilarity values, not similarity. The output format is `raw_value (normalized)` where `normalized` ranges from 0 (identical) to ~1 (very different). To get true SSIM (where 1 = identical), compute `1 - normalized`. The bundled compare.sh handles this conversion automatically.
+
+**Interpretation:**
+| SSIM | Meaning |
+|------|---------|
+| 1.00 | Identical |
+| > 0.95 | Very similar structure — differences are likely content-only (text, data) |
+| 0.85–0.95 | Moderately similar — some layout differences present |
+| < 0.85 | Structurally different — layout, positioning, or major styling changes |
+
+**When to use SSIM over AE/pixel diff:**
+- Comparing design mockup (placeholder text) vs implementation (real content)
+- Comparing different data states of the same UI (empty vs populated)
+- Checking if layout is preserved across different locales/languages
+
 ### Other Available Metrics
 
 | Metric | Description |
@@ -188,12 +211,11 @@ magick image.png -crop 800x200+0+0 +repage cropped.png
 | `MAE` | Mean Absolute Error — average per-pixel difference |
 | `MSE` | Mean Squared Error — like RMSE but not square-rooted |
 | `PHASH` | Perceptual Hash — structural similarity, good for detecting same-content-different-encoding |
-| `SSIM` | Structural Similarity Index — closer to human visual perception |
 | `DSSIM` | Dissimilarity (1-SSIM) — higher means more different |
 | `NCC` | Normalized Cross-Correlation |
 | `PSNR` | Peak Signal-to-Noise Ratio (in dB) |
 
-For design QA, RMSE + AE is the recommended combination. SSIM can be useful for perceptual comparison but is harder to threshold.
+For design QA, the recommended combination is RMSE + AE + SSIM. Use AE/pixel diff for exact matching (same content), and SSIM for structural comparison (when content differs).
 
 ---
 

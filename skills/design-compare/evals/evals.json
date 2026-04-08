@@ -47,6 +47,22 @@
         "Clearly states the images match or are identical",
         "Does not hallucinate differences that don't exist"
       ]
+    },
+    {
+      "id": 4,
+      "prompt": "My design mockup at evals/test-images/reference_placeholder_content.png uses placeholder text ('Lorem ipsum') but my actual app at evals/test-images/implementation_real_content.png has real content. The layout and styling should be identical — only the text content is different. Can you compare them and confirm the design implementation is correct despite the text differences?",
+      "expected_output": "Agent runs comparison, recognizes that the pixel diff is inflated by content text differences, uses SSIM to confirm structural similarity is high, and concludes the design is correctly implemented despite different text content.",
+      "files": [
+        "evals/test-images/reference_placeholder_content.png",
+        "evals/test-images/implementation_real_content.png"
+      ],
+      "expectations": [
+        "Uses ImageMagick magick compare command",
+        "Reports SSIM metric showing high structural similarity (> 0.95)",
+        "Recognizes that pixel differences are from text content, not layout or styling issues",
+        "Does not recommend layout or CSS fixes for areas that only differ in text content",
+        "Concludes the design implementation is correct or acceptable despite the content differences"
+      ]
     }
   ]
 }

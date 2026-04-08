@@ -26,7 +26,19 @@ if [ ! -f "$IMPLEMENTATION" ]; then
 fi
 
 if ! command -v magick &> /dev/null; then
-  echo "Error: ImageMagick not found. Install with: brew install imagemagick" >&2
+  echo "" >&2
+  echo "ERROR: ImageMagick is not installed." >&2
+  echo "" >&2
+  echo "The design-compare skill requires ImageMagick 7+ to run." >&2
+  echo "Please install it for your platform:" >&2
+  echo "" >&2
+  echo "  macOS:   brew install imagemagick" >&2
+  echo "  Ubuntu:  sudo apt-get install imagemagick" >&2
+  echo "  Fedora:  sudo dnf install ImageMagick" >&2
+  echo "  Arch:    sudo pacman -S imagemagick" >&2
+  echo "  Windows: winget install ImageMagick.ImageMagick" >&2
+  echo "" >&2
+  echo "After installing, verify with: magick --version" >&2
   exit 1
 fi
 
@@ -69,9 +81,19 @@ magick composite \
 # magick compare outputs metrics to stderr and returns exit code 1 when images differ
 STATS=$(magick compare -metric RMSE -fuzz 5% "$REFERENCE" "$IMPLEMENTATION" null: 2>&1 || true)
 AE_RAW=$(magick compare -metric AE -fuzz 5% "$REFERENCE" "$IMPLEMENTATION" null: 2>&1 || true)
+SSIM_RAW=$(magick compare -metric SSIM "$REFERENCE" "$IMPLEMENTATION" null: 2>&1 || true)
 
 # AE output can be "24602" or "24602 (0.205017)" — extract just the integer count
 AE=$(echo "$AE_RAW" | awk '{print int($1)}')
+
+# ImageMagick SSIM outputs dissimilarity: "1130.32 (0.0172)" where the parenthetical
+# is the normalized value (0 = identical). Convert to SSIM where 1 = identical.
+SSIM_DISSIM=$(echo "$SSIM_RAW" | grep -oE '\(([0-9.]+)\)' | tr -d '()')
+if [ -n "$SSIM_DISSIM" ]; then
+  SSIM=$(echo "scale=4; 1 - $SSIM_DISSIM" | bc)
+else
+  SSIM="N/A"
+fi
 
 # Get total pixels
 TOTAL_PIXELS=$(magick identify -format "%[fx:w*h]" "$REFERENCE")
@@ -116,6 +138,7 @@ $([ "$RESIZED" = true ] && echo "Note:            Implementation was resized fro
 RMSE (0=identical, 1=max diff): $STATS
 Differing pixels (AE):          $AE / $TOTAL_PIXELS
 Difference percentage:          ${DIFF_PERCENT}%
+SSIM (1=identical, 0=different): $SSIM
 
 --- THRESHOLDS ---
 < 1%   : Near identical, acceptable

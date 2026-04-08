@@ -16,13 +16,19 @@ Compare two screenshots to find visual differences using ImageMagick. This skill
 
 ## Prerequisites
 
-ImageMagick 7+ must be installed. Check with:
+ImageMagick 7+ must be installed. The `compare.sh` script checks for this automatically and prints install instructions if it's missing. If the script reports ImageMagick is not installed, **stop and tell the user** — they need to install it before you can proceed. Don't try to install it yourself unless the user asks you to.
 
 ```bash
+# Check if ImageMagick is available
 magick --version
 ```
 
-If missing, install via Homebrew: `brew install imagemagick`
+Install commands by platform:
+- **macOS**: `brew install imagemagick`
+- **Ubuntu/Debian**: `sudo apt-get install imagemagick`
+- **Fedora**: `sudo dnf install ImageMagick`
+- **Arch**: `sudo pacman -S imagemagick`
+- **Windows**: `winget install ImageMagick.ImageMagick`
 
 Also needs `bc` for percentage calculations (pre-installed on macOS/Linux).
 
@@ -55,13 +61,14 @@ The `report.txt` contains structured metrics:
 
 ```
 === VISUAL DIFF REPORT ===
-Original:        reference.png
+Reference:       reference.png
 Implementation:  implementation.png
 
 --- METRICS ---
 RMSE (0=identical, 1=max diff): 0.045 (2925.5)
 Differing pixels (AE):          12847 / 2073600
 Difference percentage:          0.6196%
+SSIM (1=identical, 0=different): 0.97
 
 --- STATUS ---
 PASS — negligible difference
@@ -137,6 +144,29 @@ magick implementation.png -crop 800x200+0+0 +repage impl_header.png
 bash <skill-path>/scripts/compare.sh ref_header.png impl_header.png
 ```
 
+### Content differs between reference and implementation
+
+This is common: the design mockup has placeholder text ("Lorem ipsum") but the real app shows actual content ("Welcome to your dashboard"). A pixel diff will flag every text region as different, inflating the percentage even though the design is implemented correctly.
+
+How to handle this:
+
+1. **Check SSIM first.** SSIM (Structural Similarity Index) measures structural resemblance rather than pixel-exact matching. A high SSIM (> 0.85) combined with a high pixel diff percentage is a strong signal that the differences are content-only, not layout or styling.
+
+2. **Inspect `diff_highlighted.png` visually.** If the red areas are exclusively over text content and the surrounding layout (margins, padding, backgrounds, borders, buttons, images) is clean, the implementation is likely correct.
+
+3. **Use region cropping to verify layout.** Crop out text-heavy areas and compare structural elements separately:
+   ```bash
+   # Compare just the header (no content text)
+   magick reference.png -crop 1920x80+0+0 +repage ref_header.png
+   magick implementation.png -crop 1920x80+0+0 +repage impl_header.png
+   bash <skill-path>/scripts/compare.sh ref_header.png impl_header.png
+   ```
+
+4. **Adjust your pass criteria.** When content is expected to differ, don't target < 1% on the full image. Instead, look for:
+   - SSIM > 0.85 (structural layout matches)
+   - Cropped non-text regions at < 1% pixel diff
+   - Red highlights in `diff_highlighted.png` confined to text areas only
+
 ### Dark or complex backgrounds
 
 On dark UIs, the default lowlight color (`#1a1a1a`) may blend in. Switch to a more visible lowlight:
@@ -153,6 +183,14 @@ magick compare -highlight-color "#FF0000" -lowlight-color "#333333" \
 **AE (Absolute Error):** Raw count of pixels that differ (above the fuzz threshold). This is the most intuitive metric — "12,847 out of 2,073,600 pixels are different."
 
 **Difference percentage:** AE divided by total pixels, times 100. This is what the thresholds are based on.
+
+**SSIM (Structural Similarity Index):** A value between 0 and 1 measuring how structurally similar two images are. Unlike pixel diff, SSIM considers luminance, contrast, and structure together — closer to how humans perceive similarity. SSIM is particularly useful when content (text, data) differs between images but the layout and styling are the same. A high SSIM (> 0.85) with a high pixel diff suggests content-only changes, not design issues.
+
+| Metric | Best for |
+|--------|----------|
+| AE / Diff % | Exact pixel matching — same content, same viewport |
+| SSIM | Structural comparison — when content may differ between reference and implementation |
+| RMSE | Overall color distance — quick sanity check |
 
 The `-fuzz 5%` parameter means pixels that differ by less than 5% in color value are treated as identical. This filters out sub-pixel rendering noise that would otherwise inflate the diff count.
 
@@ -200,6 +238,9 @@ magick compare -metric RMSE -fuzz 5% reference.png implementation.png /dev/null 
 
 # Absolute pixel count
 magick compare -metric AE -fuzz 5% reference.png implementation.png /dev/null 2>&1
+
+# SSIM (structural similarity — useful when content text differs)
+magick compare -metric SSIM reference.png implementation.png /dev/null 2>&1
 
 # Total pixels for percentage calculation
 magick identify -format "%[fx:w*h]" reference.png
