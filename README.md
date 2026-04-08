@@ -8,10 +8,27 @@ I ([@DaniAkash](https://github.com/DaniAkash)) use these skills daily in my own 
 
 ## Available Skills
 
-| Skill | Evals | Iterations | Description |
-|-------|-------|------------|-------------|
-| [better-use-effect](skills/better-use-effect/SKILL.md) | 5 | 4 | Guides correct usage of React's `useEffect` hook — when to use it, when NOT to use it, and what modern alternatives exist. |
-| [design-compare](skills/design-compare/SKILL.md) | 4 | 2 | Visual diff comparison between two screenshots using ImageMagick — pixel-level diffing, SSIM structural similarity, and iterative design QA workflow. |
+### [better-use-effect](skills/better-use-effect/SKILL.md)
+
+Guides correct usage of React's `useEffect` hook — when to use it, when NOT to use it, and what modern alternatives exist. Covers derived state, data fetching, event handlers, subscriptions, and all the cases where `useEffect` is the wrong tool.
+
+```bash
+npx skills add DaniAkash/skills --skill better-use-effect
+```
+
+*5 evals · 4 iterations*
+
+---
+
+### [design-compare](skills/design-compare/SKILL.md)
+
+Visual diff comparison between two screenshots using ImageMagick. Produces pixel-level diff highlights, side-by-side composites, blend overlays, and structured reports with numerical metrics (RMSE, AE, SSIM). Handles content-only differences using structural similarity, and guides agents through an iterative design QA loop: fix → screenshot → compare → repeat.
+
+```bash
+npx skills add DaniAkash/skills --skill design-compare
+```
+
+*4 evals · 2 iterations*
 
 ## How Skills Are Built
 
@@ -37,4 +54,10 @@ skills/
 
 ## Usage
 
-Point your coding agent at a skill's `SKILL.md` to load it as context. The skill provides rules, patterns, and anti-patterns that help the agent produce higher-quality code in that domain.
+Install any skill into your project with:
+
+```bash
+npx skills add DaniAkash/skills --skill <skill-name>
+```
+
+This adds the skill to your project so your coding agent automatically picks it up. The skill provides rules, patterns, and anti-patterns that guide the agent toward higher-quality code in that domain.
