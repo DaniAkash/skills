@@ -82,12 +82,12 @@ If the user provides multiple URLs, run parallel audits — one sub-agent per UR
 | Agent 4 | 1920px, 2560px | Large / Ultra-wide |
 
 Each sub-agent workflow:
-1. `agent-browser open <url> --session <agent-N>` — open in named session
-2. `agent-browser set viewport <width> 900 --session <agent-N>` — set viewport
-3. `agent-browser screenshot <output-path> --full-page --session <agent-N>` — capture full page
+1. `agent-browser --session <agent-N> open <url>` — open in named session
+2. `agent-browser --session <agent-N> set viewport <width> 900` — set viewport
+3. `agent-browser --session <agent-N> screenshot <output-path> --full` — capture full page
 4. Inspect accessibility tree and DOM for issues
 5. Repeat for each assigned breakpoint
-6. `agent-browser close --session <agent-N>` — close session when done
+6. `agent-browser --session <agent-N> close` — close session when done
 
 After all 4 agents complete, merge findings into a single report.
 
@@ -95,25 +95,25 @@ After all 4 agents complete, merge findings into a single report.
 
 ```bash
 # Open a URL in a named session
-agent-browser open <url> --session audit-mobile
+agent-browser --session audit-mobile open <url>
 
 # Set the viewport size
-agent-browser set viewport 375 900 --session audit-mobile
+agent-browser --session audit-mobile set viewport 375 900
 
 # Take a full-page screenshot (captures entire page, not just the visible viewport)
-agent-browser screenshot ~/workbench/screenshots/<org>/<repo>/mobile-375.png --full-page --session audit-mobile
+agent-browser --session audit-mobile screenshot ~/workbench/screenshots/<org>/<repo>/mobile-375.png --full
 
 # Get an accessibility snapshot (detect overflow, missing labels, etc.)
-agent-browser snapshot --session audit-mobile
+agent-browser --session audit-mobile snapshot
 
 # Check for horizontal scroll (inject script)
-agent-browser eval "document.documentElement.scrollWidth > document.documentElement.clientWidth" --session audit-mobile
+agent-browser --session audit-mobile eval "document.documentElement.scrollWidth > document.documentElement.clientWidth"
 
 # Get computed styles for an element
-agent-browser eval "getComputedStyle(document.querySelector('nav')).display" --session audit-mobile
+agent-browser --session audit-mobile eval "getComputedStyle(document.querySelector('nav')).display"
 
 # Close the session
-agent-browser close --session audit-mobile
+agent-browser --session audit-mobile close
 ```
 
 See `references/breakpoints.md` for the full device/breakpoint reference.
@@ -179,10 +179,10 @@ After writing the report, run:
 
 ```bash
 # Close each named session used during the audit
-agent-browser close --session audit-mobile
-agent-browser close --session audit-tablet
-agent-browser close --session audit-desktop
-agent-browser close --session audit-large
+agent-browser --session audit-mobile close
+agent-browser --session audit-tablet close
+agent-browser --session audit-desktop close
+agent-browser --session audit-large close
 
 # Or close all sessions at once
 agent-browser close --all
