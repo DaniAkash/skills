@@ -84,10 +84,10 @@ If the user provides multiple URLs, run parallel audits — one sub-agent per UR
 Each sub-agent workflow:
 1. `agent-browser open <url> --session <agent-N>` — open in named session
 2. `agent-browser set viewport <width> 900 --session <agent-N>` — set viewport
-3. `agent-browser screenshot <output-path> --session <agent-N>` — capture
+3. `agent-browser screenshot <output-path> --full-page --session <agent-N>` — capture full page
 4. Inspect accessibility tree and DOM for issues
 5. Repeat for each assigned breakpoint
-6. `agent-browser close --session <agent-N>` — clean up
+6. `agent-browser close --session <agent-N>` — close session when done
 
 After all 4 agents complete, merge findings into a single report.
 
@@ -100,8 +100,8 @@ agent-browser open <url> --session audit-mobile
 # Set the viewport size
 agent-browser set viewport 375 900 --session audit-mobile
 
-# Take a screenshot
-agent-browser screenshot ~/workbench/screenshots/<org>/<repo>/mobile-375.png --session audit-mobile
+# Take a full-page screenshot (captures entire page, not just the visible viewport)
+agent-browser screenshot ~/workbench/screenshots/<org>/<repo>/mobile-375.png --full-page --session audit-mobile
 
 # Get an accessibility snapshot (detect overflow, missing labels, etc.)
 agent-browser snapshot --session audit-mobile
@@ -162,13 +162,33 @@ See `references/report-template.md` for the full report structure.
 1. Check agent-browser is installed (or Chrome DevTools MCP for auth pages)
 2. Determine operating mode and URL(s)
 3. Launch 4 parallel sub-agents (one per device group)
-4. Each agent: open URL → resize → screenshot → run check matrix
+4. Each agent: open URL → set viewport → full-page screenshot → run check matrix → close session
 5. Collect all findings from all agents
 6. Identify layout transitions (exact px where layout breaks)
 7. Group issues by severity
 8. Generate CSS fix suggestions for each issue
 9. Write report with screenshots, findings, and recommendations
+10. Close any remaining open agent-browser sessions
 ```
+
+## Session Cleanup
+
+Always close every agent-browser session after the audit is complete. Leaving sessions open wastes memory and can interfere with future browser automation tasks.
+
+After writing the report, run:
+
+```bash
+# Close each named session used during the audit
+agent-browser close --session audit-mobile
+agent-browser close --session audit-tablet
+agent-browser close --session audit-desktop
+agent-browser close --session audit-large
+
+# Or close all sessions at once
+agent-browser close --all
+```
+
+If a session was already closed by a sub-agent, `agent-browser close` on a non-existent session is safe — it will simply report that the session wasn't found.
 
 ## Layout Transition Detection
 
