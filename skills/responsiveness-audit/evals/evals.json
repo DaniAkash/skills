@@ -1,157 +1,45 @@
 {
-  "skill": "audit-responsiveness",
-  "description": "Evaluates whether the skill correctly audits responsive design issues across device breakpoints using agent-browser.",
+  "skill_name": "responsiveness-audit",
   "evals": [
     {
-      "id": "eval-01",
-      "name": "Public landing page — horizontal overflow on mobile",
-      "description": "Audit a public landing page that is known to have horizontal scroll on mobile due to a fixed-width element.",
-      "input": {
-        "url": "https://example-non-responsive-site.com",
-        "mode": "standard"
-      },
-      "expected_behavior": [
-        "Checks agent-browser is installed before proceeding",
-        "Launches 4 parallel sub-agents for mobile, tablet, desktop, large breakpoints",
-        "Takes screenshots at all 8 breakpoints",
-        "Detects horizontal overflow at 320px and 375px (check #1)",
-        "Reports overflow as Critical or High severity",
-        "Suggests CSS fix: `*, *::before, *::after { box-sizing: border-box; }` or `max-width: 100%`",
-        "Writes report to docs/responsiveness-audit-YYYY-MM-DD.md"
-      ],
-      "grading_criteria": {
-        "must_pass": [
-          "Identifies horizontal overflow issue",
-          "Reports correct affected breakpoints",
-          "Provides actionable CSS fix",
-          "Uses parallel agents (not sequential)"
-        ],
-        "should_pass": [
-          "Groups findings by severity",
-          "Generates screenshot evidence",
-          "Reports layout transitions"
-        ]
-      }
+      "id": 1,
+      "prompt": "Please audit https://news.ycombinator.com for responsive design. Check how it looks across all major device sizes and give me a full report.",
+      "expected_output": "A responsiveness audit report covering multiple breakpoints. Should identify Hacker News as having horizontal overflow or layout issues on mobile. Includes screenshots and structured findings with severity levels.",
+      "files": [],
+      "expectations": [
+        "Checks that agent-browser is installed before proceeding with the audit",
+        "Takes screenshots at 3 or more different breakpoints",
+        "Detects horizontal overflow or layout issues on mobile (320px or 375px)",
+        "Reports at least one Critical or High severity issue",
+        "Produces a structured report with named sections (e.g. Summary, Issues, Recommendations)",
+        "Saves screenshots to a file path (not just describes them)"
+      ]
     },
     {
-      "id": "eval-02",
-      "name": "Missing agent-browser — clear installation guidance",
-      "description": "agent-browser is not installed. Skill should stop and give clear, platform-specific install instructions.",
-      "input": {
-        "url": "https://example.com",
-        "mode": "standard",
-        "simulate_missing_tool": true
-      },
-      "expected_behavior": [
-        "Runs `agent-browser --version` to check",
-        "Detects it is not installed",
-        "Stops the audit immediately",
-        "Shows npm install command: `npm install -g agent-browser && agent-browser install`",
-        "Shows Homebrew command: `brew install agent-browser && agent-browser install`",
-        "Shows npx fallback: `npx agent-browser install`",
-        "Mentions https://agent-browser.dev/installation for more details",
-        "Does NOT try to install agent-browser automatically"
-      ],
-      "grading_criteria": {
-        "must_pass": [
-          "Does not proceed with the audit",
-          "Shows at least npm install command",
-          "Does not attempt auto-install"
-        ],
-        "should_pass": [
-          "Shows multiple install methods",
-          "Mentions the installation docs URL"
-        ]
-      }
+      "id": 2,
+      "prompt": "Can you do a responsiveness audit on https://tailwindcss.com? I want to know if there are any mobile layout issues across all device sizes.",
+      "expected_output": "A full 8-breakpoint audit report. Tailwind's own site is well-built so overall status should pass. Includes screenshots at multiple breakpoints, structured check matrix results.",
+      "files": [],
+      "expectations": [
+        "Takes screenshots at 5 or more different breakpoints (standard 8-breakpoint mode)",
+        "Produces a structured report with named sections",
+        "Does not report Critical issues on tailwindcss.com (well-built responsive site)",
+        "Runs the layout check matrix (mentions checking overflow, navigation, touch targets, etc.)",
+        "Saves screenshots to a file path"
+      ]
     },
     {
-      "id": "eval-03",
-      "name": "Authenticated dashboard — Chrome DevTools MCP path",
-      "description": "User wants to audit a logged-in dashboard page that requires authentication.",
-      "input": {
-        "url": "https://app.example.com/dashboard",
-        "mode": "standard",
-        "authenticated": true
-      },
-      "expected_behavior": [
-        "Recognizes the page requires authentication",
-        "Switches to Chrome DevTools MCP workflow instead of agent-browser",
-        "Asks user to open the page in Chrome and confirm they're logged in",
-        "Uses mcp__chrome-devtools__list_pages to find the tab",
-        "Tests breakpoints sequentially (not parallel — limitation noted)",
-        "Takes screenshots at each breakpoint using Chrome DevTools MCP",
-        "Notes in report that audit was done via Chrome DevTools MCP"
-      ],
-      "grading_criteria": {
-        "must_pass": [
-          "Uses Chrome DevTools MCP, not agent-browser",
-          "Does not navigate away from the authenticated page",
-          "Asks user to confirm they are logged in before proceeding"
-        ],
-        "should_pass": [
-          "Notes sequential (not parallel) limitation",
-          "Saves screenshots to correct path"
-        ]
-      }
-    },
-    {
-      "id": "eval-04",
-      "name": "Multi-URL audit — parallel execution",
-      "description": "Audit 3 URLs simultaneously. Skill should launch one sub-agent per URL, each running its own parallel breakpoint agents.",
-      "input": {
-        "urls": [
-          "https://example.com",
-          "https://example.com/about",
-          "https://example.com/pricing"
-        ],
-        "mode": "quick-mobile"
-      },
-      "expected_behavior": [
-        "Launches 3 top-level agents, one per URL",
-        "Each agent runs its own breakpoint sub-agents in parallel",
-        "All 3 audits run simultaneously",
-        "Combines results into a single report with per-URL sections",
-        "Quick mode tests only 320px, 375px, 768px per URL"
-      ],
-      "grading_criteria": {
-        "must_pass": [
-          "Runs audits in parallel across URLs",
-          "Produces a combined report with per-URL sections",
-          "Quick mode only uses 3 breakpoints"
-        ],
-        "should_pass": [
-          "Clearly separates findings per URL",
-          "Summary table covers all 3 URLs"
-        ]
-      }
-    },
-    {
-      "id": "eval-05",
-      "name": "Fully responsive site — clean pass report",
-      "description": "Audit a well-built responsive site. Skill should correctly identify it as passing with minimal or no issues.",
-      "input": {
-        "url": "https://tailwindcss.com",
-        "mode": "standard"
-      },
-      "expected_behavior": [
-        "Runs full 8-breakpoint audit",
-        "Reports Pass or Warn (no Critical/High issues)",
-        "Still generates screenshots as evidence",
-        "Writes report noting overall pass",
-        "May flag minor medium/low issues (whitespace, ultra-wide line length) — acceptable",
-        "Does NOT fabricate issues that are not real"
-      ],
-      "grading_criteria": {
-        "must_pass": [
-          "Correctly identifies no critical/high issues",
-          "Does not hallucinate issues",
-          "Still produces a complete report"
-        ],
-        "should_pass": [
-          "Explains what was checked",
-          "Screenshot evidence captured"
-        ]
-      }
+      "id": 3,
+      "prompt": "Do a quick mobile responsiveness check on https://example.com - just check 320px, 375px, and 768px and tell me what you find.",
+      "expected_output": "A quick mobile audit (3 breakpoints only). Takes screenshots at 320px, 375px, 768px. example.com is a simple static page that should mostly pass.",
+      "files": [],
+      "expectations": [
+        "Tests exactly the 3 requested breakpoints: 320px, 375px, and 768px",
+        "Does NOT run all 8 standard breakpoints (respects the quick mobile mode)",
+        "Takes at least 3 screenshots (one per breakpoint)",
+        "Produces a structured report with per-breakpoint findings",
+        "Reports minimal issues on example.com (simple static page, mostly passes)"
+      ]
     }
   ]
 }

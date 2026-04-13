@@ -83,7 +83,7 @@ If the user provides multiple URLs, run parallel audits — one sub-agent per UR
 
 Each sub-agent workflow:
 1. `agent-browser open <url> --session <agent-N>` — open in named session
-2. `agent-browser resize <width> 900 --session <agent-N>` — set viewport
+2. `agent-browser set viewport <width> 900 --session <agent-N>` — set viewport
 3. `agent-browser screenshot <output-path> --session <agent-N>` — capture
 4. Inspect accessibility tree and DOM for issues
 5. Repeat for each assigned breakpoint
@@ -97,8 +97,8 @@ After all 4 agents complete, merge findings into a single report.
 # Open a URL in a named session
 agent-browser open <url> --session audit-mobile
 
-# Resize the viewport
-agent-browser resize 375 900 --session audit-mobile
+# Set the viewport size
+agent-browser set viewport 375 900 --session audit-mobile
 
 # Take a screenshot
 agent-browser screenshot ~/workbench/screenshots/<org>/<repo>/mobile-375.png --session audit-mobile
