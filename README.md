@@ -40,7 +40,7 @@ Audits any website for responsive design issues across all major device breakpoi
 npx skills add DaniAkash/skills --skill responsiveness-audit
 ```
 
-*3 evals · 1 iteration*
+*3 evals · 2 iterations*
 
 ## How Skills Are Built
 

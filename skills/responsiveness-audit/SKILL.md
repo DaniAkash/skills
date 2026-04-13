@@ -82,12 +82,12 @@ If the user provides multiple URLs, run parallel audits — one sub-agent per UR
 | Agent 4 | 1920px, 2560px | Large / Ultra-wide |
 
 Each sub-agent workflow:
-1. `agent-browser open <url> --session <agent-N>` — open in named session
-2. `agent-browser set viewport <width> 900 --session <agent-N>` — set viewport
-3. `agent-browser screenshot <output-path> --session <agent-N>` — capture
+1. `agent-browser --session <agent-N> open <url>` — open in named session
+2. `agent-browser --session <agent-N> set viewport <width> 900` — set viewport
+3. `agent-browser --session <agent-N> screenshot <output-path> --full` — capture full page
 4. Inspect accessibility tree and DOM for issues
 5. Repeat for each assigned breakpoint
-6. `agent-browser close --session <agent-N>` — clean up
+6. `agent-browser --session <agent-N> close` — close session when done
 
 After all 4 agents complete, merge findings into a single report.
 
@@ -95,25 +95,25 @@ After all 4 agents complete, merge findings into a single report.
 
 ```bash
 # Open a URL in a named session
-agent-browser open <url> --session audit-mobile
+agent-browser --session audit-mobile open <url>
 
 # Set the viewport size
-agent-browser set viewport 375 900 --session audit-mobile
+agent-browser --session audit-mobile set viewport 375 900
 
-# Take a screenshot
-agent-browser screenshot ~/workbench/screenshots/<org>/<repo>/mobile-375.png --session audit-mobile
+# Take a full-page screenshot (captures entire page, not just the visible viewport)
+agent-browser --session audit-mobile screenshot ~/workbench/screenshots/<org>/<repo>/mobile-375.png --full
 
 # Get an accessibility snapshot (detect overflow, missing labels, etc.)
-agent-browser snapshot --session audit-mobile
+agent-browser --session audit-mobile snapshot
 
 # Check for horizontal scroll (inject script)
-agent-browser eval "document.documentElement.scrollWidth > document.documentElement.clientWidth" --session audit-mobile
+agent-browser --session audit-mobile eval "document.documentElement.scrollWidth > document.documentElement.clientWidth"
 
 # Get computed styles for an element
-agent-browser eval "getComputedStyle(document.querySelector('nav')).display" --session audit-mobile
+agent-browser --session audit-mobile eval "getComputedStyle(document.querySelector('nav')).display"
 
 # Close the session
-agent-browser close --session audit-mobile
+agent-browser --session audit-mobile close
 ```
 
 See `references/breakpoints.md` for the full device/breakpoint reference.
@@ -162,13 +162,33 @@ See `references/report-template.md` for the full report structure.
 1. Check agent-browser is installed (or Chrome DevTools MCP for auth pages)
 2. Determine operating mode and URL(s)
 3. Launch 4 parallel sub-agents (one per device group)
-4. Each agent: open URL → resize → screenshot → run check matrix
+4. Each agent: open URL → set viewport → full-page screenshot → run check matrix → close session
 5. Collect all findings from all agents
 6. Identify layout transitions (exact px where layout breaks)
 7. Group issues by severity
 8. Generate CSS fix suggestions for each issue
 9. Write report with screenshots, findings, and recommendations
+10. Close any remaining open agent-browser sessions
 ```
+
+## Session Cleanup
+
+Always close every agent-browser session after the audit is complete. Leaving sessions open wastes memory and can interfere with future browser automation tasks.
+
+After writing the report, run:
+
+```bash
+# Close each named session used during the audit
+agent-browser --session audit-mobile close
+agent-browser --session audit-tablet close
+agent-browser --session audit-desktop close
+agent-browser --session audit-large close
+
+# Or close all sessions at once
+agent-browser close --all
+```
+
+If a session was already closed by a sub-agent, `agent-browser close` on a non-existent session is safe — it will simply report that the session wasn't found.
 
 ## Layout Transition Detection
 
