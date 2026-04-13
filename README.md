@@ -32,12 +32,12 @@ npx skills add DaniAkash/skills --skill design-compare
 
 ---
 
-### [audit-responsiveness](skills/audit-responsiveness/SKILL.md)
+### [responsiveness-audit](skills/responsiveness-audit/SKILL.md)
 
 Audits any website for responsive design issues across all major device breakpoints using [agent-browser](https://agent-browser.dev/). Parallelizes screenshot capture across 4 device groups simultaneously, runs a 10-point layout check matrix at each breakpoint, and produces a detailed report with screenshots, severity-classified findings, layout transition analysis, and CSS fix suggestions. For authenticated pages, falls back to Chrome DevTools MCP to audit a live logged-in session.
 
 ```bash
-npx skills add DaniAkash/skills --skill audit-responsiveness
+npx skills add DaniAkash/skills --skill responsiveness-audit
 ```
 
 *5 evals · 0 iterations*

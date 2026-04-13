@@ -1,5 +1,5 @@
 ---
-name: audit-responsiveness
+name: responsiveness-audit
 description: "Audit any website for responsiveness across all major device breakpoints using agent-browser. Use this skill whenever you need to check if a site is mobile-friendly, find layout breaks at specific viewport widths, audit responsive design quality, test across device sizes, or generate a responsiveness report with screenshots. Trigger with 'audit responsiveness', 'check if site is responsive', 'mobile test', 'responsiveness audit', 'responsive design check', 'breakpoint test', 'test at mobile', 'is this site responsive', 'check viewport', or whenever you need to identify what layout issues exist at different screen sizes."
 compatibility: claude-code-only
 ---
