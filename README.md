@@ -32,6 +32,18 @@ npx skills add DaniAkash/skills --skill design-compare
 
 ---
 
+### [angry-reviewer](skills/angry-reviewer/SKILL.md)
+
+Gate-keeping code review skill that channels a senior engineer on-call who has been paged at 3am one too many times. Reviews diffs with zero tolerance — asserts (never suggests), applies mandatory severity tiers (P0–P3), and outputs a structured verdict designed for use in agentic pre-merge pipelines. The reviewer always reads the entire diff before returning a verdict, surfacing every issue in a single pass.
+
+```bash
+npx skills add DaniAkash/skills --skill angry-reviewer
+```
+
+*4 evals · 1 iteration*
+
+---
+
 ### [responsiveness-audit](skills/responsiveness-audit/SKILL.md)
 
 Audits any website for responsive design issues across all major device breakpoints using [agent-browser](https://agent-browser.dev/). Parallelizes screenshot capture across 4 device groups simultaneously, runs a 10-point layout check matrix at each breakpoint, and produces a detailed report with screenshots, severity-classified findings, layout transition analysis, and CSS fix suggestions. For authenticated pages, falls back to Chrome DevTools MCP to audit a live logged-in session.

@@ -1,0 +1,62 @@
+{
+  "skill_name": "angry-reviewer",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Review this diff before I merge it:\n\n```diff\ndiff --git a/src/routes/userRoute.ts b/src/routes/userRoute.ts\nindex a1b2c3d..e4f5g6h 100644\n--- a/src/routes/userRoute.ts\n+++ b/src/routes/userRoute.ts\n@@ -12,6 +12,18 @@ import { db } from '../modules/db/db'\n router.get('/users/search', async (req, res) => {\n   const { query } = req.query\n+  const results = await db.raw(\n+    `SELECT id, email, name FROM users WHERE name LIKE '%${query}%'`\n+  )\n+  res.json(results.rows)\n+})\n+\n+router.get('/users/:id', async (req, res) => {\n+  const user = await db.users.findById(req.params.id)\n+  if (user) {\n+    logger.info('User fetched', { user })\n+  }\n+  res.json(user ?? null)\n })\n```",
+      "expected_output": "A structured ANGRY REVIEW with at least one P0 for SQL injection and a separate finding for logging the full user object (potential PII exposure). Verdict must be BLOCKED. Both findings must be listed — the reviewer does not stop after the P0.",
+      "files": [],
+      "expectations": [
+        "Outputs the exact '## ANGRY REVIEW' header",
+        "Tags the SQL injection as [P0 - BLOCKER]",
+        "Tags the logger.info user object leak as a separate finding (P0 or P1)",
+        "Verdict is BLOCKED",
+        "Does not stop after finding the first issue — both issues are listed",
+        "Specifies the exact fix for the injection (parameterized query)",
+        "Uses assertive language, not softening language ('will throw' / 'will expose', not 'might' or 'consider')"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Review this before we merge to main:\n\n```diff\ndiff --git a/src/modules/orders/orders.ts b/src/modules/orders/orders.ts\nindex 1234abc..5678def 100644\n--- a/src/modules/orders/orders.ts\n+++ b/src/modules/orders/orders.ts\n@@ -8,10 +8,24 @@ import { db } from '../db/db'\n+export async function createOrder(userId: string, items: CartItem[]) {\n+  const order = await db.orders.insert({\n+    userId,\n+    status: 'pending',\n+    createdAt: new Date(),\n+  })\n+\n+  for (const item of items) {\n+    db.orderItems.insert({   // missing await\n+      orderId: order.id,\n+      productId: item.productId,\n+      quantity: item.quantity,\n+    })\n+  }\n+\n+  try {\n+    await notifyFulfillment(order.id)\n+  } catch (e) {\n+    console.log('notify failed')\n+  }\n+\n+  return order\n+}\n```",
+      "expected_output": "A structured ANGRY REVIEW with a P0 or P1 for missing await on db.orderItems.insert (order created with no items), and a separate P1 or P2 for the swallowed fulfillment error. Verdict BLOCKED. Both findings listed.",
+      "files": [],
+      "expectations": [
+        "Outputs the exact '## ANGRY REVIEW' header",
+        "Identifies the missing await on db.orderItems.insert as a critical finding (P0 or P1)",
+        "Identifies the swallowed fulfillment error (catch with console.log) as a separate finding",
+        "Verdict is BLOCKED",
+        "Both findings appear in the output — does not stop after the first",
+        "Summary mentions finding count by severity"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Can you review this diff? Want to make sure it's safe to ship.\n\n```diff\ndiff --git a/src/routes/profileRoute.ts b/src/routes/profileRoute.ts\nindex aaa1111..bbb2222 100644\n--- a/src/routes/profileRoute.ts\n+++ b/src/routes/profileRoute.ts\n@@ -1,5 +1,5 @@\n-router.get('/profile', async (req, res) => {\n+router.get('/profile', requireAuth, async (req, res) => {\n   const user = await db.users.findById(req.user.id)\n   if (!user) {\n     return res.status(404).json({ error: 'User not found' })\n   }\n-  res.json({ id: user.id, name: user.name, email: user.email })\n+  res.json({ id: user.id, name: user.name })\n })\n```",
+      "expected_output": "A structured ANGRY REVIEW with Verdict APPROVED. No findings fabricated. The diff adds auth middleware and removes email from the response — both are improvements. The reviewer should not invent problems.",
+      "files": [],
+      "expectations": [
+        "Outputs the exact '## ANGRY REVIEW' header",
+        "Verdict is APPROVED",
+        "Does not fabricate findings (no P0/P1/P2/P3 listed for things that are not problems)",
+        "Summary is terse — does not congratulate the author",
+        "Does not say 'looks good' or use softening language in a positive direction"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "This diff is going through an automated pre-merge gate. Your output will be parsed by an orchestrator that reads the Verdict line. Review everything — all issues at all severity levels.\n\n```diff\ndiff --git a/src/routes/paymentRoute.ts b/src/routes/paymentRoute.ts\nindex cccc123..dddd456 100644\n--- a/src/routes/paymentRoute.ts\n+++ b/src/routes/paymentRoute.ts\n@@ -4,18 +4,42 @@ import { stripe } from '../modules/stripe'\n+router.post('/charge', async (req, res) => {\n+  const { customerId, amount, currency } = req.body\n+\n+  // No input validation on amount or currency\n+  const charge = await stripe.charges.create({\n+    customer: customerId,\n+    amount,\n+    currency,\n+  })\n+\n+  await db.payments.insert({ customerId, amount, chargeId: charge.id })\n+  await db.orders.updateStatus(req.body.orderId, 'paid')\n+\n+  res.json({ ok: true })\n+})\n+\n+router.get('/payment-history', async (req, res) => {\n+  const payments = await db.payments.findAll()\n+  res.json(payments)\n+})\n+\n+router.delete('/payment/:id', requireAdmin, async (req, res) => {\n+  await db.payments.delete(req.params.id)\n+  res.json({ deleted: true })\n+  logger.info(`Deleted payment ${req.params.id}`)  // log after response\n+})\n```",
+      "expected_output": "A structured ANGRY REVIEW identifying: P1 for missing input validation on charge amount/currency (can charge $0 or invalid currency), P1 for missing transaction on the two writes (payments insert + orders update — partial failure leaves inconsistent state), P2 for unbounded findAll on payment history, P3 for logger after res.json (log order). Verdict BLOCKED due to P1s. All four findings listed.",
+      "files": [],
+      "expectations": [
+        "Outputs the exact '## ANGRY REVIEW' header",
+        "Verdict is BLOCKED",
+        "Identifies missing input validation as a finding (P1 or P0)",
+        "Identifies missing transaction around the two writes as a finding (P0 or P1)",
+        "Identifies unbounded findAll / missing pagination as a finding (P2)",
+        "All findings are tagged with correct severity brackets (e.g. '[P1 - CRITICAL]')",
+        "Summary includes finding count by severity"
+      ]
+    }
+  ]
+}
