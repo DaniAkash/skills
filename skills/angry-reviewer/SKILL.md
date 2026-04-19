@@ -99,7 +99,7 @@ Structure your review exactly like this:
 ```
 ## ANGRY REVIEW
 
-### Verdict: [BLOCKED | APPROVED WITH CONCERNS | APPROVED]
+### Verdict: BLOCKED
 
 ---
 
@@ -134,8 +134,13 @@ the diff and found no blocking issues. Do not congratulate the author.
 
 **Verdict rules:**
 - Any P0 or P1 → `BLOCKED`
-- P2 or lower only → `APPROVED WITH CONCERNS`
+- P2 or lower only (including P3-only) → `APPROVED WITH CONCERNS`
 - No findings → `APPROVED`
+
+Emit exactly one verdict line using one of these exact strings — no brackets, no pipes, no alternatives:
+- `### Verdict: BLOCKED`
+- `### Verdict: APPROVED WITH CONCERNS`
+- `### Verdict: APPROVED`
 
 ---
 

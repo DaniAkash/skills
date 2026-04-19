@@ -78,4 +78,4 @@ Code smell, weak naming, missing types, inconsistent style, minor readability is
 - Magic number with no explanation
 - Dead code left in the diff
 
-**Note:** P3s should be listed but never block a merge. If there are many P3s and no higher severity issues, verdict is still `APPROVED WITH CONCERNS` only if there's at least one P2.
+**Note:** P3s should be listed but never block a merge. P3-only findings still yield `APPROVED WITH CONCERNS` — not `APPROVED`. Only a completely clean diff with zero findings across all severities earns `APPROVED`.

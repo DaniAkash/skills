@@ -107,7 +107,7 @@ claude -p "$(cat /tmp/review_target.diff)" \
   > /tmp/review_output.txt
 
 # 3. Parse verdict
-VERDICT=$(grep "### Verdict:" /tmp/review_output.txt | awk '{print $3}')
+VERDICT=$(grep "### Verdict:" /tmp/review_output.txt | awk -F': ' '{print $2}')
 
 # 4. Branch on verdict
 if [ "$VERDICT" = "APPROVED" ]; then
