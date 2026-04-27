@@ -46,13 +46,13 @@ npx skills add DaniAkash/skills --skill angry-reviewer
 
 ### [runtime-trace](skills/runtime-trace/SKILL.md)
 
-Structured human-in-the-loop debugging mode for when the coding agent can't fully understand control flow from static reading. Instruments the code with prefixed `[TRACE]` log statements, hands off to the human to run the app and paste the captured output back, then uses the runtime trace to find the root cause. While in trace mode, normal rules are suspended (no commits, lint/test noise from logs is tolerated) and an explicit cleanup checklist runs before resuming normal work.
+Structured human-in-the-loop debugging mode for when the coding agent can't fully understand control flow from static reading. Instruments the code with prefixed `[TRACE]` log statements, hands off to the human to run the app and paste the captured output back, then uses the runtime trace to find the root cause. While in trace mode, normal rules are suspended (no commits, lint/test noise from logs is tolerated). The exit protocol cleanly separates *scaffolding* (the `[TRACE]` logs — removed) from *real work* (any code changes made during tracing — preserved), with an explicit cleanup checklist before resuming normal work.
 
 ```bash
 npx skills add DaniAkash/skills --skill runtime-trace
 ```
 
-*3 evals · 1 iteration*
+*4 evals · 2 iterations*
 
 ---
 
