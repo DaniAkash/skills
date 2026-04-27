@@ -1,0 +1,60 @@
+{
+  "skill_name": "runtime-trace",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I have a bug I can't figure out. The cart total displays 0 sometimes after the second item is added — but only sometimes, and only when the user changes the quantity right after adding. I've stared at this code for an hour. Help me figure out what's going on.\n\nHere's the relevant code:\n\n```ts\n// src/cart/cart.ts\nexport function recalculateTotal(items: CartItem[]): number {\n  let total = 0;\n  for (const item of items) {\n    total += item.price * item.quantity;\n  }\n  return total;\n}\n\n// src/cart/store.ts\nexport function useCartStore() {\n  const [items, setItems] = useState<CartItem[]>([]);\n  const [total, setTotal] = useState(0);\n\n  useEffect(() => {\n    setTotal(recalculateTotal(items));\n  }, [items]);\n\n  function addItem(item: CartItem) {\n    setItems([...items, item]);\n    setTotal(recalculateTotal([...items, item]));\n  }\n\n  function changeQuantity(id: string, quantity: number) {\n    const updated = items.map(i => i.id === id ? { ...i, quantity } : i);\n    setItems(updated);\n  }\n\n  return { items, total, addItem, changeQuantity };\n}\n```\n\nDon't just guess at the fix — I want to actually understand what's happening at runtime.",
+      "expected_output": "The agent enters trace mode: states a hypothesis, instruments the code with [TRACE] logs at strategic points (addItem, changeQuantity, recalculateTotal, the useEffect), and hands off to the human with a specific run command, action sequence, and capture instructions. Does NOT propose a fix yet, does NOT commit, does NOT just guess at the bug.",
+      "files": [],
+      "expectations": [
+        "Articulates a hypothesis or specific question before adding logs (not just 'let me add logs')",
+        "Adds at least 3 log statements with the exact prefix '[TRACE]'",
+        "Each [TRACE] log includes a location identifier (file name, line, or function name)",
+        "Each [TRACE] log includes variable values (items, total, or relevant state)",
+        "Provides a handoff message telling the human what command to run, what action to take, what to capture, and how to send it back",
+        "Does NOT propose a code fix yet — only instruments and asks for the trace",
+        "Does NOT mention committing the trace logs"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Here's the trace I captured. I added the [TRACE] logs you suggested earlier and ran the bug:\n\nAction taken: added 'Apple' (qty 1, $2), then added 'Banana' (qty 1, $1), then changed Apple quantity from 1 to 2.\n\nTrace output:\n\n```\n[TRACE] store.ts addItem:enter item={id:'apple',price:2,qty:1} items=[]\n[TRACE] store.ts addItem:setItems newItems=[apple]\n[TRACE] store.ts addItem:setTotal newTotal=2\n[TRACE] cart.ts recalculateTotal:enter items=[apple] total=0\n[TRACE] cart.ts recalculateTotal:return total=2\n[TRACE] store.ts useEffect:fired items=[apple]\n[TRACE] cart.ts recalculateTotal:enter items=[apple] total=0\n[TRACE] cart.ts recalculateTotal:return total=2\n[TRACE] store.ts addItem:enter item={id:'banana',price:1,qty:1} items=[apple]\n[TRACE] store.ts addItem:setItems newItems=[apple,banana]\n[TRACE] store.ts addItem:setTotal newTotal=3\n[TRACE] cart.ts recalculateTotal:enter items=[apple,banana] total=0\n[TRACE] cart.ts recalculateTotal:return total=3\n[TRACE] store.ts useEffect:fired items=[apple,banana]\n[TRACE] cart.ts recalculateTotal:enter items=[apple,banana] total=0\n[TRACE] cart.ts recalculateTotal:return total=3\n[TRACE] store.ts changeQuantity:enter id=apple quantity=2 items=[apple,banana]\n[TRACE] store.ts changeQuantity:setItems newItems=[apple-q2,banana]\n[TRACE] store.ts useEffect:fired items=[apple-q2,banana]\n[TRACE] cart.ts recalculateTotal:enter items=[apple-q2,banana] total=3\n[TRACE] cart.ts recalculateTotal:return total=5\n```\n\nWhat's going on? Should we add more logs?",
+      "expected_output": "The agent reads the trace in order, identifies that the bug is NOT in this trace (total is correctly 5 = 2*2 + 1), notes that the user described 'sometimes 0' but this run shows 3 -> 5 with no 0 ever appearing. Either: asks for a re-run with the specific failing scenario, asks for environment details, or proposes additional [TRACE] logs to capture more state. Does NOT commit, does NOT claim a fix yet.",
+      "files": [],
+      "expectations": [
+        "Reads the trace and references specific entries by their content (not just generic 'I see the trace')",
+        "Notices that the bug ('total shows 0 sometimes') is NOT reproduced in this trace — total ends at 5",
+        "Either asks for another round of tracing or asks for clarification on what action triggers the 0",
+        "Does NOT claim the bug is fixed",
+        "Does NOT propose committing changes",
+        "Does NOT skip the trace and just guess at a fix"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "We found the bug — the second `setTotal(recalculateTotal([...items, item]))` in `addItem` was racing against the useEffect, and the stale closure on `items` was the issue. I've confirmed it.\n\nNow let's clean up. Here's the current state of `src/cart/store.ts` with all the trace logs we added:\n\n```ts\nimport { useState, useEffect } from 'react';\nimport { recalculateTotal } from './cart';\nimport type { CartItem } from './types';\n\nexport function useCartStore() {\n  const [items, setItems] = useState<CartItem[]>([]);\n  const [total, setTotal] = useState(0);\n\n  useEffect(() => {\n    console.log('[TRACE]', 'store.ts', 'useEffect:fired', { items });\n    setTotal(recalculateTotal(items));\n  }, [items]);\n\n  function addItem(item: CartItem) {\n    console.log('[TRACE]', 'store.ts', 'addItem:enter', { item, items });\n    const newItems = [...items, item];\n    setItems(newItems);\n    console.log('[TRACE]', 'store.ts', 'addItem:setItems', { newItems });\n    const newTotal = recalculateTotal(newItems);\n    setTotal(newTotal);\n    console.log('[TRACE]', 'store.ts', 'addItem:setTotal', { newTotal });\n  }\n\n  function changeQuantity(id: string, quantity: number) {\n    console.log('[TRACE]', 'store.ts', 'changeQuantity:enter', { id, quantity, items });\n    const updated = items.map(i => i.id === id ? { ...i, quantity } : i);\n    setItems(updated);\n    console.log('[TRACE]', 'store.ts', 'changeQuantity:setItems', { newItems: updated });\n  }\n\n  return { items, total, addItem, changeQuantity };\n}\n```\n\nClean this up and write the actual fix.",
+      "expected_output": "The agent removes ALL [TRACE] log statements from the file, mentions running grep to verify nothing remains, mentions running lint and tests, and writes the actual fix (which is to remove the redundant setTotal call in addItem since the useEffect handles it). Now the agent is back in normal mode and commits are allowed.",
+      "files": [],
+      "expectations": [
+        "Output contains a cleaned version of store.ts with ZERO occurrences of '[TRACE]' or console.log",
+        "Mentions running 'grep' (or rg or equivalent) to verify [TRACE] is fully removed",
+        "Mentions checking lint and/or tests pass",
+        "Writes the actual fix — removes the redundant setTotal call in addItem (since useEffect already handles it)",
+        "Indicates that trace mode is over and normal commits are now allowed"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "We're done tracing — confirmed the bug was a stale closure on `items`. Time to clean up the trace work and get this ready to commit.\n\nHere's the current state of `src/cart/store.ts`:\n\n```ts\nimport { useState, useEffect } from 'react';\nimport { recalculateTotal } from './cart';\nimport type { CartItem } from './types';\n\nexport function useCartStore() {\n  const [items, setItems] = useState<CartItem[]>([]);\n  const [total, setTotal] = useState(0);\n\n  useEffect(() => {\n    console.log('[TRACE]', 'store.ts', 'useEffect:fired', { items });\n    setTotal(recalculateTotal(items));\n  }, [items]);\n\n  function addItem(item: CartItem) {\n    console.log('[TRACE]', 'store.ts', 'addItem:enter', { item });\n    setItems(prev => {\n      const newItems = [...prev, item];\n      console.log('[TRACE]', 'store.ts', 'addItem:setItems', { newItems });\n      return newItems;\n    });\n  }\n\n  function changeQuantity(id: string, quantity: number) {\n    console.log('[TRACE]', 'store.ts', 'changeQuantity:enter', { id, quantity });\n    setItems(prev => {\n      const updated = prev.map(i => i.id === id ? { ...i, quantity } : i);\n      console.log('[TRACE]', 'store.ts', 'changeQuantity:setItems', { newItems: updated });\n      return updated;\n    });\n  }\n\n  return { items, total, addItem, changeQuantity };\n}\n```\n\nClean it up.",
+      "expected_output": "The agent recognizes that two distinct things happened during trace mode: [TRACE] logs (scaffolding, must be removed) and the setItems(prev => ...) functional updater pattern (real code change that fixes the stale closure — must be preserved). The cleaned output strips logs but keeps the functional updaters. The agent does NOT revert to setItems([...items, item]) and does NOT write a separate fix — the fix is already in place.",
+      "files": [],
+      "expectations": [
+        "Output's cleaned store.ts contains ZERO occurrences of '[TRACE]' or console.log",
+        "Output PRESERVES the setItems(prev => ...) functional updater pattern in BOTH addItem and changeQuantity (does not revert to setItems([...items, item]) or items.map(...) without functional form)",
+        "Does NOT write a new separate fix — recognizes that the functional updater pattern already in the file is the fix",
+        "Demonstrates understanding that logs are scaffolding while structural code changes are real work — either by explicit framing or by correctly preserving non-log changes",
+        "Mentions verifying via grep, lint, or tests"
+      ]
+    }
+  ]
+}

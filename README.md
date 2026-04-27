@@ -44,6 +44,18 @@ npx skills add DaniAkash/skills --skill angry-reviewer
 
 ---
 
+### [runtime-trace](skills/runtime-trace/SKILL.md)
+
+Structured human-in-the-loop debugging mode for when the coding agent can't fully understand control flow from static reading. Instruments the code with prefixed `[TRACE]` log statements, hands off to the human to run the app and paste the captured output back, then uses the runtime trace to find the root cause. While in trace mode, normal rules are suspended (no commits, lint/test noise from logs is tolerated). The exit protocol cleanly separates *scaffolding* (the `[TRACE]` logs — removed) from *real work* (any code changes made during tracing — preserved), with an explicit cleanup checklist before resuming normal work.
+
+```bash
+npx skills add DaniAkash/skills --skill runtime-trace
+```
+
+*4 evals · 2 iterations*
+
+---
+
 ### [responsiveness-audit](skills/responsiveness-audit/SKILL.md)
 
 Audits any website for responsive design issues across all major device breakpoints using [agent-browser](https://agent-browser.dev/). Parallelizes screenshot capture across 4 device groups simultaneously, runs a 10-point layout check matrix at each breakpoint, and produces a detailed report with screenshots, severity-classified findings, layout transition analysis, and CSS fix suggestions. For authenticated pages, falls back to Chrome DevTools MCP to audit a live logged-in session.
