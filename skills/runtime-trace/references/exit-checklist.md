@@ -2,6 +2,15 @@
 
 Trace mode exits when the root cause is confirmed by the human. Before resuming normal work (commits allowed, lint/tests must pass), run this checklist in order. Don't skip steps — leftover trace logs ship to production more often than you'd think.
 
+## The principle: scaffolding vs. real work
+
+Two layers happened during trace mode and they have **different lifespans**:
+
+- **`[TRACE]` log statements** — *scaffolding*. Tagged with `[TRACE]` so they're greppable. They come out on exit, every time, with no exceptions.
+- **Code changes** (everything else you wrote: defensive guards, functional updates, restructures, hypothesis patches that turned out to be the fix) — *real work*. They **stay** on exit.
+
+The cleanup below is targeted at the scaffolding only. Do not revert your code changes. If a change you made during tracing turned out to be the fix, that's a feature of the workflow, not something to undo.
+
 ---
 
 ## 1. Get explicit confirmation from the human
@@ -12,14 +21,24 @@ If they say "yes, that's the bug" — proceed.
 
 ---
 
-## 2. Remove every `[TRACE]` log statement
+## 2. Remove every `[TRACE]` log statement (and **only** the log statements)
 
-Go through each file you instrumented and delete every line you added. The instructions are:
+This step is narrow on purpose: you're removing scaffolding, not reverting work.
 
-- Remove the **entire log statement**, including any helper imports you added solely to support the trace (e.g. an unused `pprint` import, a temporary `dataclasses.asdict` call wrapper, a `console.log` helper, etc.)
-- Do **not** comment them out — delete them
-- Do **not** convert them to permanent logging — that's a separate decision and should be its own change
-- If you added logs inside a hot loop, double-check the loop is back to its original form
+**Remove:**
+- Every `[TRACE]` log statement you added, in full
+- Imports/helpers that exist **solely** to support tracing (e.g. an unused `pprint`, a logging-only wrapper added just for the trace)
+
+**Keep:**
+- All other code changes you made during tracing — defensive guards, refactors, functional updaters, hypothesis patches, the change that turned out to be the fix
+- These are real work and live on after trace mode
+
+**Don't:**
+- Comment logs out — delete them
+- Convert logs to permanent logging — that's a separate decision and should be its own change
+- Revert structural changes you made alongside the logs because "they were part of the trace work"
+
+If a log was inside a hot loop, double-check the loop is back to its original form (no leftover counter, no leftover guard that existed only to throttle the log).
 
 ---
 
@@ -86,14 +105,22 @@ Same logic as lint:
 
 ---
 
-## 6. Now write the fix
+## 6. Decide what's left to do
 
-Trace mode is over. The actual bug fix is a separate piece of work that starts now. Treat it as such:
+Trace mode is over. There are two cases:
 
+**Case A — A code change you made during tracing already fixes the bug.**
+Common: while testing a hypothesis you switched to a functional updater, added a guard, or restructured logic, and the human confirmed in Step 5 that this also resolves the symptom. The fix is already in the file. There's nothing to write — but consider:
+- Add a regression test that captures the bug, so this doesn't come back
+- Make sure the change is scoped (not a sweeping refactor smuggled in under "the fix")
+- The commit message references the bug, not the trace
+
+**Case B — The bug is still there.**
+You confirmed the cause with the trace, but no code change you made during tracing happened to fix it. Write the fix now as a normal piece of work:
 - It's a fresh change, not a continuation of the trace
-- It should be small and scoped to the root cause you confirmed
-- Test the fix (manually or with a new test case)
-- Commit with a meaningful message that references the bug, not the trace
+- Small and scoped to the root cause you confirmed
+- Test it (manually or with a new test case)
+- Commit with a meaningful message that references the bug
 
 ---
 
@@ -110,11 +137,12 @@ If the trace itself produced learnings worth keeping (e.g. "this codepath isn't 
 ```
 ☐ Human confirmed root cause
 ☐ All [TRACE] log statements removed
+☐ Code changes from trace mode are kept (don't revert them)
 ☐ grep '\[TRACE\]' returns nothing in source code
 ☐ Lint passes
 ☐ Tests pass
-☐ Fix is written as a separate, scoped change
-☐ Commit the fix
+☐ Fix is in place — either via trace-mode code changes (Case A) or written now (Case B)
+☐ Commit
 ```
 
 Don't tick "trace mode complete" until every box is ticked.

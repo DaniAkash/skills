@@ -22,7 +22,14 @@ You are stuck. The code looks fine, you've read it twice, but the bug is still t
 
 This skill gives you a structured way to **gather runtime evidence with the human as your experiment runner**. You instrument the suspect code with `[TRACE]` log statements, the human runs the app and triggers the bug, you read the trace and see exactly where reality diverges from what you expected. No guessing.
 
-While you're doing this, you are **not** in normal "ship code and commit" mode. You are in **evidence-gathering mode**. Different rules apply — see below.
+Two layers happen during this work, and they have **different lifespans**:
+
+- **The `[TRACE]` log statements** are *scaffolding*. Tagged with `[TRACE]` so they're easy to grep, copy, and strip. Always temporary — they come out on exit.
+- **Code changes** (defensive guards, functional updates, restructured logic, hypothesis-testing patches, even the eventual fix) are *real work*. They stay when you exit. They're not part of the scaffolding.
+
+That distinction is the whole game. When you exit, you remove the scaffolding and keep the work.
+
+While you're tracing, normal commit/lint/test discipline is paused — you're in active iteration, not shipping. Once the human confirms the bug is understood and you've stripped the logs, normal flow resumes.
 
 ---
 
@@ -102,16 +109,23 @@ Don't just declare the bug found. Say what the trace showed and what you now bel
 
 > "The trace shows `recalculateTotal` is called twice on the second add — once with the new item and once with the stale items array, and the second call clobbers the first. The bug is that we're recalculating in both the reducer and the effect. Does that match what you're seeing? If yes, I'll clean up the trace logs and write the fix."
 
+If you already made a code change during tracing that appears to have fixed the bug, **state that explicitly** so the human can confirm both the cause and the fix in one step:
+
+> "The trace shows the same stale-closure pattern I suspected. I switched `setItems` to the functional updater form on line 28 while tracing — that change appears to fix it. Can you confirm both: (1) is this the cause you're seeing, and (2) does the fix on line 28 hold? If yes, I'll just strip the `[TRACE]` logs and we're done — the code change stays."
+
 ### Step 6 — Exit trace mode
 
-Once the human confirms, exit cleanly:
+Once the human confirms the bug is understood, exit cleanly. The cleanup is **targeted at the scaffolding only** — the logs come out, the code changes stay.
 
-1. Remove **every** `[TRACE]` log statement you added
-2. Run `grep -r '\[TRACE\]' <project>` (or equivalent) and verify it returns nothing
-3. Make sure lint passes
-4. Make sure tests pass
-5. Now — and only now — write the actual fix as a separate piece of work
-6. Commits are allowed again
+1. Remove **every** `[TRACE]` log statement you added — and any imports/helpers that exist *solely* to support tracing (e.g. an unused `pprint`, a logging-only wrapper)
+2. **Keep all other code changes you made during tracing** — defensive guards, functional updates, restructures, hypothesis patches that turned out to fix the bug. These are real work, not scaffolding. Don't revert them.
+3. Run `grep -r '\[TRACE\]' <project>` (or equivalent) and verify it returns nothing
+4. Make sure lint passes
+5. Make sure tests pass
+6. Decide what's left to do:
+   - **If your trace-mode code changes already fix the bug**, you're done with the fix itself — consider adding a test that captures the bug, then commit
+   - **If the bug is still there**, write the fix now (it's a normal piece of work, not a continuation of trace mode)
+7. Commits are allowed again
 
 See `references/exit-checklist.md` for the full verification.
 
@@ -123,13 +137,16 @@ These rules are **off** while you're between Step 1 and Step 6. They turn back o
 
 | Rule | Normal mode | Trace mode |
 |------|-------------|------------|
-| Git commits | Required at meaningful points | **Do not commit** — trace logs are not commit-worthy |
-| Lint cleanliness | Must pass | Tolerated if caused by added logs (e.g. unused imports for log helpers, console.log in code) |
-| Test passing | Must pass | Tolerated if caused by added logs (e.g. logs interfering with test snapshots) |
-| Claiming the bug is fixed | Allowed when verified | **Not allowed** — only allowed once trace data confirms the divergence |
-| Writing the actual fix | Encouraged | **Defer** — instrument first, gather evidence, then fix |
+| Git commits | Required at meaningful points | **Do not commit** while `[TRACE]` logs are still in the code |
+| Lint cleanliness | Must pass | Tolerated when caused by added logs (gone after exit) |
+| Test passing | Must pass | Tolerated when caused by added logs |
+| `[TRACE]` log statements | N/A | **Scaffolding** — added freely while tracing, fully removed on exit |
+| Code changes (guards, refactors, hypothesis patches, the actual fix) | Standard discipline | **Allowed and kept** — these are real work, not scaffolding |
+| Claiming the bug is fixed | Allowed when verified | **Only after the trace shows what was happening** — don't paper over the cause with a hopeful change |
 
-The goal of trace mode is *evidence*, not *progress*. Suppressing the normal "ship it" reflexes is what makes the mode work — if you try to fix and instrument at the same time, you'll hide the bug under a half-fix and never see what was actually happening.
+The point isn't to freeze normal work — it's to **separate the temporary scaffolding from the lasting changes**. You can absolutely make code changes while tracing (a defensive guard to test a hypothesis, a switch to functional state updates, a restructure that incidentally fixes the bug). Those stay. Only the `[TRACE]` log statements are temporary.
+
+What trace mode protects against is *premature* claims of a fix — a code change that "seems to make the bug go away" without trace evidence about *why* the bug was happening can easily be hiding the cause rather than fixing it. So: change code freely, but don't claim the bug is fixed until the trace explains what was happening.
 
 **Note:** Pre-existing test or lint failures unrelated to your trace logs are not "tolerated" — those still matter, you just don't have to *fix* them while in trace mode. Don't merge "lint failures from added logs" with "lint failures that already existed in the codebase."
 
