@@ -42,6 +42,19 @@
         "Writes the actual fix — removes the redundant setTotal call in addItem (since useEffect already handles it)",
         "Indicates that trace mode is over and normal commits are now allowed"
       ]
+    },
+    {
+      "id": 4,
+      "prompt": "We're done tracing — confirmed the bug was a stale closure on `items`. Time to clean up the trace work and get this ready to commit.\n\nHere's the current state of `src/cart/store.ts`:\n\n```ts\nimport { useState, useEffect } from 'react';\nimport { recalculateTotal } from './cart';\nimport type { CartItem } from './types';\n\nexport function useCartStore() {\n  const [items, setItems] = useState<CartItem[]>([]);\n  const [total, setTotal] = useState(0);\n\n  useEffect(() => {\n    console.log('[TRACE]', 'store.ts', 'useEffect:fired', { items });\n    setTotal(recalculateTotal(items));\n  }, [items]);\n\n  function addItem(item: CartItem) {\n    console.log('[TRACE]', 'store.ts', 'addItem:enter', { item });\n    setItems(prev => {\n      const newItems = [...prev, item];\n      console.log('[TRACE]', 'store.ts', 'addItem:setItems', { newItems });\n      return newItems;\n    });\n  }\n\n  function changeQuantity(id: string, quantity: number) {\n    console.log('[TRACE]', 'store.ts', 'changeQuantity:enter', { id, quantity });\n    setItems(prev => {\n      const updated = prev.map(i => i.id === id ? { ...i, quantity } : i);\n      console.log('[TRACE]', 'store.ts', 'changeQuantity:setItems', { newItems: updated });\n      return updated;\n    });\n  }\n\n  return { items, total, addItem, changeQuantity };\n}\n```\n\nClean it up.",
+      "expected_output": "The agent recognizes that two distinct things happened during trace mode: [TRACE] logs (scaffolding, must be removed) and the setItems(prev => ...) functional updater pattern (real code change that fixes the stale closure — must be preserved). The cleaned output strips logs but keeps the functional updaters. The agent does NOT revert to setItems([...items, item]) and does NOT write a separate fix — the fix is already in place.",
+      "files": [],
+      "expectations": [
+        "Output's cleaned store.ts contains ZERO occurrences of '[TRACE]' or console.log",
+        "Output PRESERVES the setItems(prev => ...) functional updater pattern in BOTH addItem and changeQuantity (does not revert to setItems([...items, item]) or items.map(...) without functional form)",
+        "Does NOT write a new separate fix — recognizes that the functional updater pattern already in the file is the fix",
+        "Demonstrates understanding that logs are scaffolding while structural code changes are real work — either by explicit framing or by correctly preserving non-log changes",
+        "Mentions verifying via grep, lint, or tests"
+      ]
     }
   ]
 }
