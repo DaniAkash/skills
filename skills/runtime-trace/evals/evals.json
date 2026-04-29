@@ -55,6 +55,20 @@
         "Demonstrates understanding that logs are scaffolding while structural code changes are real work — either by explicit framing or by correctly preserving non-log changes",
         "Mentions verifying via grep, lint, or tests"
       ]
+    },
+    {
+      "id": 5,
+      "prompt": "Here's the [TRACE] output from the first round of logs. The bug: cart total displays 0 sometimes after adding the second item — you can see the symptom in this trace.\n\nAction: User added Apple ($2, qty 1), then added Banana ($1, qty 1). UI displayed total=0.\n\nTrace:\n\n```\n[TRACE] store.ts addItem:enter item={id:'apple',price:2,quantity:1} items=[]\n[TRACE] store.ts addItem:setItems newItems=[apple]\n[TRACE] store.ts addItem:setTotal newTotal=2\n[TRACE] CartView:render items=[apple] total=2\n[TRACE] store.ts addItem:enter item={id:'banana',price:1,quantity:1} items=[apple]\n[TRACE] store.ts addItem:setItems newItems=[apple,banana]\n[TRACE] store.ts addItem:setTotal newTotal=NaN\n[TRACE] CartView:render items=[apple,banana] total=NaN\n[TRACE] CartView:render items=[apple,banana] total=0\n```\n\nThe bug reproduced — total went NaN then 0. What should we do next?",
+      "expected_output": "The agent recognizes that the trace shows the SYMPTOM (total going NaN then 0) but does NOT show the CAUSE — i.e., why setTotal received NaN. The agent requests another round of [TRACE] logs to instrument the recalculateTotal function and the inputs flowing into it, instead of declaring a root cause like 'NaN coercion' or 'we need a NaN guard.' The agent stays in trace mode and does not propose a fix.",
+      "files": [],
+      "expectations": [
+        "Identifies that the trace shows total transitioning from NaN to 0 (the symptom)",
+        "Recognizes that the trace does NOT show the cause of NaN — it shows setTotal receiving NaN but does not show what made the value NaN (the multiplication inputs, recalculateTotal internals, etc.)",
+        "Requests another round of [TRACE] logs at narrower scope — e.g. inside recalculateTotal, on the item.price/item.quantity values, or on what setTotal is being called with",
+        "Does NOT declare 'NaN coercion' or 'NaN guard' or similar surface-level pattern matching as the root cause based on this single round",
+        "Does NOT propose a fix yet (no useMemo refactor, no defensive code, no commit)",
+        "Stays in trace mode — does not exit, does not mention being ready to commit"
+      ]
     }
   ]
 }
