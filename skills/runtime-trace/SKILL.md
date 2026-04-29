@@ -33,6 +33,16 @@ While you're tracing, normal commit/lint/test discipline is paused — you're in
 
 ---
 
+## Trace mode is iterative — expect multiple rounds
+
+The strongest pull when you're tracing is the urge to **exit early**. You see one striking line in the trace, your brain pattern-matches to "I found it!", you start writing the fix. Resist this. A striking trace line is *evidence*, not *the answer* — it's the start of a hypothesis, not the conclusion.
+
+Real trace work usually takes **2–4 rounds** of: instrument, run, read trace, narrow scope or pivot hypothesis, instrument again, run again. Each round either confirms or kills a hypothesis. Single-round resolutions exist but they are rare — and they are almost always the literal "wrong operator" / "missing await" type bugs where you didn't really need a trace at all.
+
+If you're wrapping up after one round on a non-trivial bug, slow down. The default action after reading a trace is **another round**, not "declare the cause." Single-round root-cause claims are how trace mode fails — agents declare a plausible-looking divergence is the bug, exit, write a fix, the bug comes back, and the human has to re-trace from scratch.
+
+---
+
 ## When to enter trace mode
 
 You should enter trace mode when:
@@ -49,6 +59,16 @@ You should **not** enter trace mode when:
 - The error message already tells you the line and the cause
 - You haven't read the code yet — read it first
 - The user is asking for a feature, not debugging an issue
+
+Once you're in trace mode, you should **not exit yet** when:
+
+- The trace didn't actually reproduce the bug (you saw "interesting things" but no symptom)
+- Your hypothesis explains the most prominent anomaly but not all of them
+- You can't articulate what the trace would look like if your hypothesis were wrong
+- The human responded with "let's try it" / "sounds right" / "ok" rather than actively confirming the cause
+- You've only run one round of trace on a non-trivial bug
+
+Each of these is a "go back to Step 3, more logs" signal — not an exit signal.
 
 ---
 
@@ -99,19 +119,46 @@ When the human pastes the trace back, read it **in order** and compare to what y
 
 - Does the order of calls match your mental model?
 - Are the variable values what you expected at each step?
-- **Where does reality first diverge from expectation?** That divergence is your bug — or it's the next place to instrument.
+- **Where does reality first diverge from expectation?** That divergence is your bug — or, more often, it's the next place to instrument.
 
-If the trace is enough to explain the bug, go to Step 5. If not, narrow the scope: add more logs around the divergence point and ask for another round (return to Step 3).
+**The default action after reading a trace is to go back to Step 3 with narrower logs.** Proceeding to Step 5 (declaring root cause) is the *exception*, not the norm. Only proceed to Step 5 when you can honestly answer yes to all four:
+
+1. **Did the trace show the bug actually happening?** Many traces show "interesting things" but don't reproduce the symptom — final values look correct, no error fired, etc. If the bug isn't visible in the data, you don't have evidence yet.
+2. **Does my hypothesis explain *every* anomaly in the trace?** Or just the most prominent one? Loose ends usually mean your hypothesis is incomplete or wrong — and exiting on an incomplete hypothesis is how the bug "comes back" after the fix.
+3. **Can I describe what the trace would look like if my hypothesis were wrong?** Specifically: what's the second-most-likely explanation, and what would we see under it? If you can't articulate this, your hypothesis isn't yet falsifiable — it's a guess in a confident voice.
+4. **Have I run at least one narrowing round?** Single-round root-cause claims on non-trivial bugs are the failure mode this skill is designed to prevent. Unless the bug is a literal one-liner (wrong operator, missing await, off-by-one) that the trace makes self-evident, you should have at least one round of "narrow the scope to verify."
+
+If you can't honestly check all four, **go back to Step 3**. Add 2–4 more logs at the narrower scope and ask the human to re-run. The cost of one more round is small. The cost of declaring the wrong root cause is large.
 
 ### Step 5 — Confirm root cause with the human
 
-Don't just declare the bug found. Say what the trace showed and what you now believe is happening. Ask the human to confirm before exiting trace mode.
+This step is **friction on purpose**. It exists to slow you down before you exit, because exiting too early is the most common trace-mode failure.
 
-> "The trace shows `recalculateTotal` is called twice on the second add — once with the new item and once with the stale items array, and the second call clobbers the first. The bug is that we're recalculating in both the reducer and the effect. Does that match what you're seeing? If yes, I'll clean up the trace logs and write the fix."
+When you present findings to the human, frame them so a "no" is genuinely possible — not as a "does this look right?" rubber-stamp. Vague phrasings get vague yeses. Specific phrasings get the pushback you actually need.
 
-If you already made a code change during tracing that appears to have fixed the bug, **state that explicitly** so the human can confirm both the cause and the fix in one step:
+**Bad** (invites a "sure, ship it" rubber-stamp):
+> "I think the bug is X. Does that look right? Should I clean up?"
 
-> "The trace shows the same stale-closure pattern I suspected. I switched `setItems` to the functional updater form on line 28 while tracing — that change appears to fix it. Can you confirm both: (1) is this the cause you're seeing, and (2) does the fix on line 28 hold? If yes, I'll just strip the `[TRACE]` logs and we're done — the code change stays."
+**Good** (invites pushback):
+> "The trace shows `recalculateTotal` is called twice on the second add — once with the new item, once with the stale items array, and the second call clobbers the first. So the bug is that we're recalculating in both the reducer and the effect.
+>
+> Two things I'm not 100% sure about:
+> 1. The trace doesn't show what the UI eventually displayed — could you confirm the user sees a brief flash of the wrong total, or just `0`?
+> 2. Is this happening on every add, or only some? My hypothesis says always — does that match what you've observed?
+>
+> If you can confirm both, I'll exit trace mode and write the fix. If anything is off — even slightly — I'll do another round of logs first."
+
+Wait for an explicit confirmation. **"Sounds right, let's try it"** and **"yeah just commit it"** are not confirmations — they're the human deferring to you. If the human doesn't actively engage with your hypothesis, you don't have evidence yet — go back to Step 3 or 4.
+
+#### If a code change you made during tracing already fixes the bug
+
+State both — the cause (from the trace) and the fix (the code change) — and ask the human to confirm both:
+
+> "The trace confirms the stale-closure pattern. While instrumenting, I switched `setItems` to the functional updater form on line 28 — that change appears to fix it. I want to confirm two things separately:
+> 1. **Is this the cause** you're seeing? (Stale closure on `items` between `addItem` and the items-effect.)
+> 2. **Does the fix hold?** Specifically: when you re-run with the change in place, the bug is gone *consistently*, not just on one happy run.
+>
+> If both yes, I'll strip the `[TRACE]` logs and we're done — the code change stays."
 
 ### Step 6 — Exit trace mode
 
@@ -143,6 +190,7 @@ These rules are **off** while you're between Step 1 and Step 6. They turn back o
 | `[TRACE]` log statements | N/A | **Scaffolding** — added freely while tracing, fully removed on exit |
 | Code changes (guards, refactors, hypothesis patches, the actual fix) | Standard discipline | **Allowed and kept** — these are real work, not scaffolding |
 | Claiming the bug is fixed | Allowed when verified | **Only after the trace shows what was happening** — don't paper over the cause with a hopeful change |
+| Single-round resolution | Allowed if obvious | **Suspect by default** — most non-trivial bugs need 2–4 rounds. "I see it!" pattern-matching after one round is the failure mode |
 
 The point isn't to freeze normal work — it's to **separate the temporary scaffolding from the lasting changes**. You can absolutely make code changes while tracing (a defensive guard to test a hypothesis, a switch to functional state updates, a restructure that incidentally fixes the bug). Those stay. Only the `[TRACE]` log statements are temporary.
 
@@ -187,9 +235,12 @@ For more variations (no-repro scenarios, follow-up rounds, multi-process apps), 
 
 ## What this skill protects against
 
-This skill exists because two failure modes are common:
+This skill exists because three failure modes are common:
 
 1. **Guessing instead of asking.** Agent rereads the code, makes a guess, ships a "fix" that doesn't address the real issue, bug persists, user is frustrated.
 2. **Asking poorly.** Agent says "can you run it and tell me what happens?" — gets back "it's still broken" — has no more information than before.
+3. **Exiting too early.** Agent gets *one* round of trace, sees a striking divergence, pattern-matches to "I found it!", declares root cause, ships a fix, the bug is still there. The human has to re-trace from scratch — and trust in the agent has dropped a notch.
 
-Trace mode replaces both with: *gather specific evidence, read it carefully, then act*.
+Trace mode replaces all three with: *gather specific evidence, read it carefully across multiple rounds, confirm with the human in a way that allows pushback, then act*.
+
+The third failure mode is the most insidious because it *looks* like the skill is working — the agent did add logs, did read the trace, did "confirm" with the human. The protection lives in the friction at Step 4 (default to another round) and Step 5 (frame the confirmation so the human can disagree). Don't shortcut those.

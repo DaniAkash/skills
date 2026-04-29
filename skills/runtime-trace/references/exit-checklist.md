@@ -2,6 +2,19 @@
 
 Trace mode exits when the root cause is confirmed by the human. Before resuming normal work (commits allowed, lint/tests must pass), run this checklist in order. Don't skip steps — leftover trace logs ship to production more often than you'd think.
 
+## 0. Are you actually ready to exit?
+
+This list assumes the human has confirmed the root cause. Before working through the cleanup steps, gut-check:
+
+- Did the trace show the bug **actually happening**, or did you see something that *looked like it might be related*?
+- Did the human say "yes, that's the cause," or did they say "let's try it" / "sounds right" / "ok, commit it"? Deferring to you is not confirming.
+- Could you describe — without looking at the trace — what the trace would look like if your hypothesis were wrong, and explain why the actual trace doesn't match that?
+- Have you run **at least one narrowing round** of trace, or is this all based on the first round?
+
+If any of these don't have a confident "yes," you're not at the exit. Go back to Step 4 of the protocol — either request more logs at a narrower scope, or refine the hypothesis and ask the human a follow-up that could be answered "no."
+
+The cost of one more round is small. The cost of declaring the wrong root cause and committing a fake fix is large.
+
 ## The principle: scaffolding vs. real work
 
 Two layers happened during trace mode and they have **different lifespans**:
