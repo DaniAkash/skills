@@ -4,16 +4,12 @@ description: >
   Structured human-in-the-loop debugging mode for when static code reading isn't enough.
   Use this skill whenever you're stuck debugging an issue where you can't tell what's actually
   happening at runtime — async timing, complex control flow, multiple call paths, conditional
-  branches, or bugs that only reproduce when the app is running. Instead of guessing, the skill
-  guides you through instrumenting the code with prefixed `[TRACE]` log statements, handing off
-  to the human to run the app and capture the output, then reading the runtime trace to find the
-  root cause. While in trace mode, normal rules are suspended (no commits, lint/test noise from
-  logs is tolerated) — the goal is evidence, not progress. Trigger on: "I'm stuck debugging X",
-  "help me figure out why Y is happening", "something weird is going on at runtime", "let's add
-  some logs and see", "I can't tell what's wrong without running it", "trace what happens when",
-  or any debugging conversation where the agent needs to see actual runtime behavior to make
-  progress. When in doubt and you've reread the same code three times without a hypothesis,
-  use this skill — gathering evidence beats guessing.
+  branches, or bugs that only reproduce when the app is running. The skill guides you through
+  instrumenting the code with prefixed `[TRACE]` log statements, handing off to the human to
+  run the app and capture the output, then reading the runtime trace to find the root cause.
+  Trigger on: "I'm stuck debugging X", "help me figure out why Y is happening", "something
+  weird is going on at runtime", "let's add some logs and see", or any debugging conversation
+  where the agent needs to see actual runtime behavior to make progress.
 ---
 
 # Runtime Trace
