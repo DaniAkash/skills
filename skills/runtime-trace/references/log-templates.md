@@ -3,9 +3,11 @@
 Every trace log starts with `[TRACE]` and includes:
 - **Location** — file name + line or function name
 - **Phase** — what's happening (`enter`, `exit`, `branch`, `pre-mutation`, `post-mutation`, `await-pre`, `await-post`)
-- **Variables** — the relevant state, stringified
+- **Safe variables only** — the minimum non-sensitive state needed to test the hypothesis
 
 The prefix `[TRACE]` is what lets the human grep for your logs without copying unrelated noise. Don't change it. Don't pluralize it. Don't translate it.
+
+Never print raw secrets or private user data. Do not log tokens, cookies, auth headers, passwords, API keys, session IDs, payment data, full environment objects, full request/response bodies, or personal data. Prefer booleans, counts, lengths, types, enum values, and short non-secret identifiers.
 
 ---
 
@@ -14,8 +16,13 @@ The prefix `[TRACE]` is what lets the human grep for your logs without copying u
 ### Good
 
 ```ts
-console.log('[TRACE]', 'cart.ts:42', 'recalculateTotal:enter', { items, total });
-console.log('[TRACE]', 'cart.ts:55', 'recalculateTotal:branch-empty', { items });
+console.log('[TRACE]', 'cart.ts:42', 'recalculateTotal:enter', {
+  itemCount: items.length,
+  totalCents: total,
+});
+console.log('[TRACE]', 'cart.ts:55', 'recalculateTotal:branch-empty', {
+  itemCount: items.length,
+});
 console.log('[TRACE]', 'cart.ts:67', 'recalculateTotal:post-mutation', { newTotal });
 ```
 
@@ -23,8 +30,8 @@ For objects that don't stringify well (Maps, Sets, class instances), convert exp
 
 ```ts
 console.log('[TRACE]', 'cache.ts:30', 'cache:state', {
-  entries: Array.from(cache.entries()),
-  size: cache.size,
+  entryCount: cache.size,
+  hasEntries: cache.size > 0,
 });
 ```
 
@@ -35,7 +42,7 @@ function Cart({ items }: Props) {
   console.log('[TRACE]', 'Cart.tsx', 'render', { itemCount: items.length });
 
   useEffect(() => {
-    console.log('[TRACE]', 'Cart.tsx', 'effect:items-changed', { items });
+    console.log('[TRACE]', 'Cart.tsx', 'effect:items-changed', { itemCount: items.length });
   }, [items]);
   // ...
 }
@@ -57,8 +64,8 @@ console.log(`[TRACE] ${items}`);              // Template-stringified object bec
 ### Good
 
 ```python
-print('[TRACE]', 'cart.py:42', 'recalculate_total:enter', {'items': items, 'total': total})
-print('[TRACE]', 'cart.py:55', 'recalculate_total:branch-empty', {'items': items})
+print('[TRACE]', 'cart.py:42', 'recalculate_total:enter', {'item_count': len(items), 'total_cents': total})
+print('[TRACE]', 'cart.py:55', 'recalculate_total:branch-empty', {'item_count': len(items)})
 print('[TRACE]', 'cart.py:67', 'recalculate_total:post-mutation', {'new_total': new_total})
 ```
 
@@ -74,7 +81,7 @@ For dataclasses, use `dataclasses.asdict()` so you see the fields, not just the 
 
 ```python
 from dataclasses import asdict
-print('[TRACE]', 'orders.py:88', 'order:state', asdict(order))
+print('[TRACE]', 'orders.py:88', 'order:state', {'status': order.status, 'item_count': len(order.items)})
 ```
 
 ### Bad
@@ -92,7 +99,7 @@ print(f'[TRACE] items={items}')    # f-string of a list of objects loses field d
 ### Good
 
 ```go
-fmt.Printf("[TRACE] cart.go:42 RecalculateTotal:enter items=%+v total=%v\n", items, total)
+fmt.Printf("[TRACE] cart.go:42 RecalculateTotal:enter itemCount=%d total=%v\n", len(items), total)
 fmt.Printf("[TRACE] cart.go:67 RecalculateTotal:post-mutation newTotal=%v\n", newTotal)
 ```
 
@@ -118,7 +125,7 @@ fmt.Printf("[TRACE] %v\n", items)    // %v on a struct hides field names
 ### Good
 
 ```rust
-println!("[TRACE] cart.rs:42 recalculate_total:enter items={:#?} total={}", items, total);
+println!("[TRACE] cart.rs:42 recalculate_total:enter item_count={} total={}", items.len(), total);
 println!("[TRACE] cart.rs:67 recalculate_total:post-mutation new_total={}", new_total);
 ```
 
@@ -144,13 +151,13 @@ println!("{:?}", items);             // No prefix, no location
 For shell, write to stderr so trace output doesn't pollute pipelines:
 
 ```bash
-echo "[TRACE] deploy.sh:line:$LINENO step=build env=$ENV target=$TARGET" >&2
+echo "[TRACE] deploy.sh:line:$LINENO step=build env_name=$ENV_NAME target=$TARGET" >&2
 ```
 
 For multi-variable dumps:
 
 ```bash
-echo "[TRACE] deploy.sh:$LINENO state: ENV=$ENV BRANCH=$BRANCH BUILD_ID=$BUILD_ID" >&2
+echo "[TRACE] deploy.sh:$LINENO state: env_name=$ENV_NAME branch=$BRANCH build_id=$BUILD_ID" >&2
 ```
 
 ---
@@ -159,6 +166,6 @@ echo "[TRACE] deploy.sh:$LINENO state: ENV=$ENV BRANCH=$BRANCH BUILD_ID=$BUILD_I
 
 1. **Always prefix with `[TRACE]`** — exact spelling, exact bracket style. The human will grep for this literal string.
 2. **Always include location** — file name plus line or function name. Without this, a 50-line trace is unreadable.
-3. **Always stringify objects explicitly** — naive interpolation often produces `[object Object]`, `<Order object>`, or similar useless output.
+3. **Log derived, non-sensitive values** — counts, booleans, lengths, types, statuses, and non-secret IDs beat raw objects.
 4. **Don't log inside hot loops without a counter** — if you log inside a 10,000-iteration loop, the human gets 10,000 lines and you get nothing useful. Log every Nth iteration or only the final state.
-5. **Don't log secrets or PII** — even in a trace, even temporarily. Use placeholders (`token=<redacted>`) or only log lengths/types.
+5. **Don't log secrets or PII** — even in a trace, even temporarily. Use placeholders or only log lengths/types.

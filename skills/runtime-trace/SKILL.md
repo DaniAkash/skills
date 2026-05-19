@@ -18,6 +18,8 @@ You are stuck. The code looks fine, you've read it twice, but the bug is still t
 
 This skill gives you a structured way to **gather runtime evidence with the human as your experiment runner**. You instrument the suspect code with `[TRACE]` log statements, the human runs the app and triggers the bug, you read the trace and see exactly where reality diverges from what you expected. No guessing.
 
+Trace output is evidence, not a data dump. Never log secrets, credentials, tokens, cookies, auth headers, full environment objects, raw request/response bodies, or personal data. Redact before logging and ask the human to redact again before pasting trace output into chat.
+
 Two layers happen during this work, and they have **different lifespans**:
 
 - **The `[TRACE]` log statements** are *scaffolding*. Tagged with `[TRACE]` so they're easy to grep, copy, and strip. Always temporary — they come out on exit.
@@ -87,7 +89,8 @@ Add log statements at strategic points along the suspect code path. Every line m
 
 - Start with the prefix `[TRACE]` so the human can grep/copy them cleanly
 - Identify the location: file name and either line number or function name
-- Dump the relevant variables (stringified — don't trust `Object.toString`)
+- Include only the minimum safe variables needed to test the hypothesis
+- Redact sensitive values before they are printed: use `<redacted>`, counts, booleans, lengths, types, or short non-secret identifiers instead of raw values
 - Be at a meaningful point: function entries, branch decisions, key state mutations, async resolution points
 
 Place logs at:
@@ -99,12 +102,14 @@ Place logs at:
 
 **Don't over-instrument.** Five well-placed logs beat fifty scattered ones — too many makes the trace unreadable and tells the human you don't actually have a hypothesis. See `references/log-templates.md` for language-specific examples.
 
+**Redaction is mandatory.** Before adding each log, ask: "Could this value contain a credential, cookie, token, auth header, email, phone number, address, user-provided private text, payment data, or raw env/config object?" If yes, do not print it. Print a safe derived value instead, such as `{ hasToken: Boolean(token), tokenLength: token?.length }`.
+
 ### Step 3 — Hand off to the human
 
 You cannot run the app yourself. Send a message to the human telling them exactly:
 1. **What command to run** (e.g. `bun dev`, `pnpm test:e2e`, `python manage.py runserver`)
 2. **What action to take** that should reproduce the bug (e.g. "open the app, add two items to cart, then change the quantity of the first item")
-3. **What to capture** — every line containing `[TRACE]`, in the order they appear
+3. **What to capture** — every line containing `[TRACE]`, in the order they appear, after replacing any accidental secret or private value with `<redacted>`
 4. **How to send it back** — paste into the conversation, in order, inside a code block
 
 Use the templates in `references/handoff-prompts.md`. The handoff message is what makes this skill work — a vague "can you run it?" gets a vague answer.
@@ -202,12 +207,15 @@ Every line you add starts with `[TRACE]` and includes location + variables. Quic
 
 **JavaScript / TypeScript**
 ```ts
-console.log('[TRACE]', 'cart.ts:42', 'recalculateTotal:enter', { items, total });
+console.log('[TRACE]', 'cart.ts:42', 'recalculateTotal:enter', {
+  itemCount: items.length,
+  totalCents: total,
+});
 ```
 
 **Python**
 ```python
-print('[TRACE]', 'cart.py:42', 'recalculate_total:enter', {'items': items, 'total': total})
+print('[TRACE]', 'cart.py:42', 'recalculate_total:enter', {'item_count': len(items), 'total_cents': total})
 ```
 
 For other languages and language-specific gotchas (e.g. struct printing in Go, debug formatting in Rust), see `references/log-templates.md`.
@@ -221,7 +229,7 @@ For other languages and language-specific gotchas (e.g. struct printing in Go, d
 > 1. Run: `bun dev`
 > 2. Open the app at `localhost:3000/cart`
 > 3. Add two items, then change the quantity of the first item from 1 to 2
-> 4. From the terminal, copy every line containing `[TRACE]` — in the order they appear — and paste them back here in a code block
+> 4. From the terminal, copy every line containing `[TRACE]` — in the order they appear — replace any accidental secret or private value with `<redacted>`, then paste them back here in a code block
 >
 > While we're tracing, I won't commit anything and will ignore any lint/test noise from the added logs. Once we find the root cause and you confirm it, I'll strip all the logs and write the fix.
 
