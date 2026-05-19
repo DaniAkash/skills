@@ -6,7 +6,7 @@ Every handoff message must answer four questions for the human:
 
 1. **What command to run** (exact, copy-pasteable)
 2. **What action to take** (the steps that should reproduce the bug)
-3. **What to capture** (every line containing `[TRACE]`, in order)
+3. **What to capture** (every line containing `[TRACE]`, in order, with accidental secrets/private values replaced by `<redacted>`)
 4. **How to send it back** (paste in the conversation, in a code block, in order)
 
 ---
@@ -21,7 +21,7 @@ Use this as the first request after instrumenting the code.
 >
 > 1. **Run:** `<exact command>`
 > 2. **Do this:** `<the action that reproduces the bug — be specific>`
-> 3. **Capture:** every line in the terminal/output that starts with `[TRACE]`, in the order they appear
+> 3. **Capture:** every line in the terminal/output that starts with `[TRACE]`, in the order they appear. Before pasting, replace any accidental credential, cookie, token, auth header, API key, password, email, phone number, payment data, or private user text with `<redacted>`.
 > 4. **Send back:** paste them into the conversation in a code block, preserving order
 >
 > While we're tracing, I won't commit anything and will ignore any lint/test noise from the added logs. Once we find the root cause and you confirm it, I'll strip the logs and write the fix.
@@ -50,7 +50,7 @@ If the first trace shows that the bug happens somewhere between two of your log 
 >
 > *(adds more logs)*
 >
-> Please re-run the same scenario and paste the new trace. Same protocol — every line starting with `[TRACE]`, in order, in a code block.
+> Please re-run the same scenario and paste the new trace. Same protocol — every line starting with `[TRACE]`, in order, in a code block, with accidental secrets or private values replaced by `<redacted>`.
 
 ---
 
@@ -104,6 +104,6 @@ If the trace involves multiple processes (frontend + backend, multiple workers, 
 > 1. **Run frontend:** `bun dev` (in one terminal)
 > 2. **Run API:** `bun api:dev` (in another terminal)
 > 3. **Reproduce:** open the app, click "Save"
-> 4. **Capture:** every line containing `[TRACE]` from **both terminals**, and please indicate which terminal each line came from. The order is important.
+> 4. **Capture:** every line containing `[TRACE]` from **both terminals**, and please indicate which terminal each line came from. The order is important. Redact accidental secrets or private values before pasting.
 >
 > Easiest way: paste the frontend trace in one code block labeled "FRONTEND" and the API trace in another labeled "API". I'll merge them by timestamp / order.
