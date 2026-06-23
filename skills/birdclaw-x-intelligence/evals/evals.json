@@ -1,0 +1,69 @@
+{
+  "skill_name": "birdclaw-x-intelligence",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Give me a briefing on what's happening on X right now.",
+      "expected_output": "A ranked 'what's happening' briefing sourced from Today's News (bird news) and the For You feed (bird home), not the Following feed. Preflight auth check first. Freshness stated. No auto-posting.",
+      "files": [],
+      "assertions": [
+        "Runs a preflight auth/transport check (birdclaw auth status and/or bird check) before building the briefing",
+        "Sources from Today's News via `bird news` and/or the For You feed via `bird home`",
+        "Does NOT source from the chronological Following feed (no bare `sync timeline` without --for-you, no `bird home --following`)",
+        "Ranks events by an impact signal (postCount for news, or engagement for For-You tweets)",
+        "States data freshness / recency in the output",
+        "Does not post anything to X"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "What's the news on Twitter today? Pull from Today's News.",
+      "expected_output": "Uses bird news --news-only, ranks headlines by postCount, presents them with category and a link. Does not use the Following feed.",
+      "files": [],
+      "assertions": [
+        "Uses `bird news` (Today's News / Explore tabs), with --news-only or equivalent",
+        "Ranks or orders the news items by postCount",
+        "Presents headlines with their category and/or a link",
+        "Does not rely on the chronological Following feed as the source"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Find me the hottest AI and dev tweets I should reply to today.",
+      "expected_output": "Candidate pool from live bird home + bird search (which carry reply/retweet/like counts), ranked by blended engagement (not likes alone), filtered to originals, excluding already-replied and blocked/muted authors. Output is suggested reply angles with links, never posted replies.",
+      "files": [],
+      "assertions": [
+        "Builds the candidate pool from live bird reads (`bird home` and/or `bird search`) that carry engagement metrics",
+        "Ranks by a blended engagement score using retweetCount and replyCount, not likeCount alone",
+        "Filters to original tweets (excludes replies / inReplyToStatusId set)",
+        "Excludes blocked and muted authors (consults birdclaw blocks/mutes lists)",
+        "Outputs suggested reply angles with tweet links and does NOT post any reply"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "What should I tweet about this week?",
+      "expected_output": "Hot topics from bird news/trending crossed with the user's lane derived this run from their authored history + likes + bookmarks, gap-checked against recent posts, with 2-3 concrete draft tweet ideas per topic. Does not auto-post.",
+      "files": [],
+      "assertions": [
+        "Derives the user's topic lane from their own footprint (authored tweets, likes, and/or bookmarks) rather than hardcoding a topic list",
+        "Sources hot topics from bird news / bird trending and/or bird search",
+        "Performs a gap check against the user's recent authored tweets (avoid topics already covered)",
+        "Produces concrete draft tweet ideas (2-3) per recommended topic",
+        "Does not post anything to X"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "My birdclaw data might be a day old. Give me an accurate read of what's trending and who to engage with.",
+      "expected_output": "Detects/handles staleness: checks freshness against a 12h threshold and refreshes (sync timeline --for-you --refresh) or uses always-fresh live bird reads, before presenting. Is transparent about data recency.",
+      "files": [],
+      "assertions": [
+        "Checks data freshness (newest For-You tweet age or sync_cache) against a ~12 hour threshold",
+        "Refreshes stale local data with `sync timeline --for-you --refresh` OR sources from always-fresh live `bird` reads before answering",
+        "Is explicit in the output about how fresh the data is",
+        "Does not silently present stale data as current"
+      ]
+    }
+  ]
+}
