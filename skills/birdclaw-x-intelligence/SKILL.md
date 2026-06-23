@@ -66,6 +66,8 @@ bird check                    # confirm the bird cookie transport is alive
 - If auth is missing or `availableTransport` is `none`, **stop** and tell the user to authenticate (`birdclaw auth`). Do not emit an empty briefing.
 - The AI passes (`birdclaw digest` / `discuss`) need `OPENAI_API_KEY`. If it is unset, those will fail. You can still deliver a full briefing from `bird` live reads plus your own synthesis. Say which path you took.
 
+**Account scoping is a real gotcha.** A machine can hold credentials for more than one account, and birdclaw's local mention/inbox cache may be scoped to a different account than the one whose For You feed you are reading. If `inbox` / `mentions` come back looking like someone else's data, or `sync authored` fails with an account mismatch, you are crossing accounts. Pass `--account <handle>` to pin commands to the right account, and if a surface still will not resolve, degrade gracefully: build the briefing from the surfaces that do work and say which one you could not fetch, rather than presenting another account's data as the user's.
+
 Then decide scope: a full three-part briefing, or just the one part the user asked for. Don't run work the user didn't ask for.
 
 ## Step 1 - What is happening

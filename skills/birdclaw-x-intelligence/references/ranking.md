@@ -12,13 +12,18 @@ engagement = 3 * replyCount + 2 * retweetCount + 1 * likeCount
 
 This is a starting heuristic, not a law. Replies are weighted highest because a tweet generating a live argument is the best place to add a voice; retweets next because reach compounds; likes are the weakest signal (cheap, passive). Adjust if the user tells you they care more about reach than conversation.
 
-To weight by how far a reply would travel, factor in author reach (followers). Use a log so a 3M-follower account does not entirely drown a sharp 30k-follower one:
+Rank the candidate pool by `engagement`, descending.
+
+### Reach multiplier - only when you actually have follower counts
+
+Ideally you would also weight by how far a reply travels, factoring in author reach. But note a tested reality: `bird home` and `bird search` payloads do NOT reliably carry per-author `followersCount` (the field is often absent or the author object is partial). So do not assume it is there. Only apply a reach multiplier when you genuinely have the follower number, for example after resolving the author against the local `profiles` table or a profile lookup:
 
 ```
+# only when author.followersCount is known:
 impact = engagement * (1 + log10(1 + author.followersCount))
 ```
 
-Rank the candidate pool by `impact`, descending.
+When follower counts are unavailable (the common case for live `bird` reads), rank by `engagement` alone and say so in the briefing rather than inventing a reach figure. Resolving followers for every candidate is an extra lookup per author, so do it only if the user specifically wants reach-weighting; otherwise engagement is a strong enough signal on its own.
 
 ## News ranking (for events)
 

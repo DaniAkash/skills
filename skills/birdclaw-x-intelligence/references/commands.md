@@ -39,15 +39,15 @@ Returns a JSON array of tweets, each:
 
 ```json
 {
-  "id": "2069096072627007811",
+  "id": "<tweet-id>",
   "text": "...",
   "createdAt": "2026-06-23T05:45:52.000Z",
   "replyCount": 12,
   "retweetCount": 48,
   "likeCount": 310,
-  "conversationId": "2069096072627007811",
-  "author": { "handle": "...", "name": "...", "followersCount": ... },
-  "authorId": "816653",
+  "conversationId": "<conversation-id>",
+  "author": { "handle": "...", "name": "...", "followersCount": "(often absent)" },
+  "authorId": "<author-id>",
   "quotedTweet": { ... }
 }
 ```
@@ -66,8 +66,8 @@ Returns a JSON array of news items:
 
 ```json
 {
-  "id": "twitter://trending/2069127207004549519",
-  "headline": "Vercel Launches WebSocket Support for Serverless Functions",
+  "id": "twitter://trending/<trend-id>",
+  "headline": "Example Headline About a Dev Tool Launch",
   "category": "AI · News",
   "timeAgo": "12 hours ago",
   "postCount": 691,
