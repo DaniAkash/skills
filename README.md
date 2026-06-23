@@ -66,6 +66,18 @@ npx skills add DaniAkash/skills --skill responsiveness-audit
 
 *3 evals · 2 iterations*
 
+---
+
+### [birdclaw-x-intelligence](skills/birdclaw-x-intelligence/SKILL.md)
+
+Turns X (Twitter) into an actionable intelligence briefing using the local-first [birdclaw](https://birdclaw.sh/) CLI and its `bird` transport. Answers three standing questions: what is happening right now, which tweets are worth replying to, and what to tweet about. Sources from the algorithmic "For You" feed and X's "Today's News" Explore tab (never the noisy chronological Following feed), ranks engagement from live reads that carry real reply/retweet/like counts, enforces a 12-hour freshness gate, respects local block and mute lists, and never posts without explicit approval. Every command and JSON shape in the references was tested against a live authenticated install.
+
+```bash
+npx skills add DaniAkash/skills --skill birdclaw-x-intelligence
+```
+
+*5 evals · 1 iteration*
+
 ## How Skills Are Built
 
 Each skill follows a rigorous process powered by [skill-creator](https://github.com/anthropics/skills/tree/main/skills/skill-creator):
